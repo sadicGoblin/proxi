@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── SOLO PARA LA PRUEBA ──────────────────────────────────────────────
+    // Abierto para poder probar entre 2 personas sin login.
+    // ANTES de producción: cerrar con autenticación y validación por sala.
+    // (ver MODELO-NEGOCIO.md §6 — privacidad y Ley 21.719)
+    // Cubre miembros/ (ubicaciones) y pair/ (intercambio de parámetros UWB).
+    match /salas/{sala}/{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

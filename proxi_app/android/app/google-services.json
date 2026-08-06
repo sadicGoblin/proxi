@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "188965732831",
+    "project_id": "proxi-live",
+    "storage_bucket": "proxi-live.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:188965732831:android:da29d418de7f7e351ac46a",
+        "android_client_info": {
+          "package_name": "com.favric.proxi_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD_5VTxcktjXTuhWY0GyLrS-epBeWZpb3E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

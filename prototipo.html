@@ -1,0 +1,566 @@
+<title>Proxi — Prototipo</title>
+<style>
+  :root {
+    --page-bg: #e9ebf3;
+    --page-bg-2: #dde0ec;
+    --ink: #1a1d2b;
+    --ink-soft: #565c72;
+    --card: #ffffff;
+    --card-line: rgba(20, 24, 44, 0.10);
+    --accent: #ff4d6d;
+
+    --n-bg-1: #0b0e1a;
+    --n-bg-2: #161b34;
+    --n-surface: #12172a;
+    --n-surface-2: #1a2039;
+    --n-line: rgba(255, 255, 255, 0.09);
+    --n-text: #edeff7;
+    --n-mute: #888fad;
+    --you: #ff4d6d;
+    --friend: #45c6f0;
+
+    --mono: "SF Mono", ui-monospace, "JetBrains Mono", "Menlo", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page-bg: #07090f; --page-bg-2: #0d1020; --ink: #e8eaf2; --ink-soft: #9096ac;
+      --card: #12162a; --card-line: rgba(255, 255, 255, 0.09);
+    }
+  }
+  :root[data-theme="light"] {
+    --page-bg: #e9ebf3; --page-bg-2: #dde0ec; --ink: #1a1d2b; --ink-soft: #565c72;
+    --card: #ffffff; --card-line: rgba(20, 24, 44, 0.10);
+  }
+  :root[data-theme="dark"] {
+    --page-bg: #07090f; --page-bg-2: #0d1020; --ink: #e8eaf2; --ink-soft: #9096ac;
+    --card: #12162a; --card-line: rgba(255, 255, 255, 0.09);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; font-family: var(--sans); color: var(--ink);
+    background: radial-gradient(120% 80% at 50% -10%, var(--page-bg-2), var(--page-bg) 60%);
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    gap: 30px; padding: 44px 20px 64px;
+  }
+
+  .masthead { text-align: center; max-width: 460px; }
+  .masthead .eyebrow {
+    font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--accent); font-weight: 700; margin: 0 0 10px;
+  }
+  .masthead h1 {
+    font-size: clamp(30px, 6vw, 42px); line-height: 1.02; margin: 0 0 12px;
+    font-weight: 800; letter-spacing: -0.03em; text-wrap: balance;
+  }
+  .masthead p { margin: 0; color: var(--ink-soft); font-size: 15.5px; line-height: 1.55; text-wrap: pretty; }
+
+  .phone {
+    width: 100%; max-width: 384px; aspect-ratio: 384 / 812;
+    background: linear-gradient(200deg, var(--n-bg-2), var(--n-bg-1) 55%);
+    border-radius: 46px; padding: 12px;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.04), 0 2px 3px rgba(0,0,0,0.4), 0 40px 80px -30px rgba(4, 6, 20, 0.85);
+    position: relative; flex-shrink: 0;
+  }
+  .screen {
+    position: absolute; inset: 12px; border-radius: 35px; overflow: hidden;
+    background: var(--n-bg-1); display: flex; flex-direction: column; color: var(--n-text);
+  }
+
+  .statusbar {
+    height: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; position: relative; z-index: 5;
+  }
+  .statusbar .dots { display: flex; gap: 4px; align-items: center; }
+  .statusbar .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--n-text); display: inline-block; opacity: 0.9; }
+  .statusbar .batt { width: 22px; height: 11px; border-radius: 3px; border: 1.5px solid rgba(255,255,255,0.6); position: relative; }
+  .statusbar .batt::after { content: ""; position: absolute; inset: 1.5px; width: 70%; background: var(--n-text); border-radius: 1px; }
+
+  .appbar {
+    flex-shrink: 0; padding: 6px 20px 12px; display: flex; align-items: center; justify-content: space-between;
+    position: relative; z-index: 5;
+  }
+  .brand { display: flex; align-items: baseline; gap: 9px; }
+  .brand .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.04em; }
+  .brand .logo span { color: var(--you); }
+  .brand .tag { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--n-mute); font-weight: 700; }
+  .live {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--friend); background: rgba(69, 198, 240, 0.12); border: 1px solid rgba(69, 198, 240, 0.25);
+    padding: 5px 10px; border-radius: 999px;
+  }
+  .live b { width: 6px; height: 6px; border-radius: 50%; background: var(--friend); }
+
+  .map { position: relative; flex: 1; min-height: 0; touch-action: manipulation; cursor: crosshair; }
+  .map canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .hint {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    background: rgba(10, 13, 26, 0.82); backdrop-filter: blur(8px); border: 1px solid var(--n-line);
+    color: var(--n-text); padding: 9px 15px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+    white-space: nowrap; display: flex; align-items: center; gap: 8px;
+    transition: opacity 0.45s ease, transform 0.45s ease; z-index: 4; pointer-events: none;
+  }
+  .hint .tapicon { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--you); flex-shrink: 0; }
+  .hint.gone { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+
+  /* layers control */
+  .layers {
+    position: absolute; bottom: 12px; right: 12px; z-index: 4;
+    display: flex; gap: 3px; padding: 4px;
+    background: rgba(10, 13, 26, 0.78); backdrop-filter: blur(10px);
+    border: 1px solid var(--n-line); border-radius: 13px;
+  }
+  .layers button {
+    border: none; background: transparent; color: var(--n-mute);
+    font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 0.01em;
+    padding: 7px 10px; border-radius: 9px; cursor: pointer; transition: background 0.15s, color 0.15s;
+  }
+  .layers button[aria-pressed="true"] { background: rgba(255,255,255,0.12); color: var(--n-text); }
+  .layers button:focus-visible { outline: 2px solid var(--friend); outline-offset: 1px; }
+
+  .zoomtag {
+    position: absolute; top: 12px; left: 12px; z-index: 4;
+    font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: 0.03em;
+    color: var(--n-mute); background: rgba(10,13,26,0.7); border: 1px solid var(--n-line);
+    padding: 4px 8px; border-radius: 8px; opacity: 0; transition: opacity 0.3s;
+  }
+  .zoomtag.show { opacity: 1; }
+
+  .sheet {
+    flex-shrink: 0; background: linear-gradient(180deg, var(--n-surface), var(--n-bg-1));
+    border-top: 1px solid var(--n-line); border-radius: 24px 24px 0 0; padding: 16px 20px 22px;
+    position: relative; z-index: 6; box-shadow: 0 -18px 40px -24px rgba(0,0,0,0.7);
+  }
+  .grip { width: 38px; height: 4px; border-radius: 3px; background: rgba(255,255,255,0.18); margin: 0 auto 16px; }
+
+  .readout { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  .readout .puck {
+    width: 44px; height: 44px; border-radius: 14px; flex-shrink: 0; display: grid; place-items: center;
+    background: rgba(255, 77, 109, 0.14); border: 1px solid rgba(255, 77, 109, 0.3);
+  }
+  .readout .puck.friend { background: rgba(69, 198, 240, 0.14); border-color: rgba(69, 198, 240, 0.3); }
+  .readout .puck b { width: 12px; height: 12px; border-radius: 50%; background: var(--you); box-shadow: 0 0 12px var(--you); }
+  .readout .puck.friend b { background: var(--friend); box-shadow: 0 0 12px var(--friend); }
+  .readout .txt { flex: 1; min-width: 0; }
+  .readout .txt .lead { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+  .readout .txt .sub { font-size: 12.5px; color: var(--n-mute); margin-top: 2px; }
+  .readout .metric { text-align: right; }
+  .readout .metric .big {
+    font-family: var(--mono); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em; line-height: 1;
+  }
+  .readout .metric .unit { font-size: 11px; color: var(--n-mute); margin-top: 4px; letter-spacing: 0.05em; }
+
+  .cta {
+    width: 100%; border: none; border-radius: 15px; padding: 16px; font-family: var(--sans);
+    font-size: 15.5px; font-weight: 700; letter-spacing: -0.01em; color: #fff; cursor: pointer;
+    background: linear-gradient(180deg, #ff607d, var(--you)); box-shadow: 0 10px 24px -10px rgba(255, 77, 109, 0.8);
+    transition: transform 0.12s ease, opacity 0.2s ease, filter 0.2s ease;
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+  }
+  .cta:active { transform: translateY(1px) scale(0.995); }
+  .cta:disabled { opacity: 0.4; box-shadow: none; cursor: not-allowed; filter: saturate(0.5); }
+  .cta:focus-visible { outline: 3px solid rgba(255,255,255,0.5); outline-offset: 2px; }
+  .cta .pin { width: 15px; height: 15px; border-radius: 50% 50% 50% 0; background: #fff; transform: rotate(45deg); }
+
+  .share { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin-top: 4px; }
+  .share button {
+    border: 1px solid var(--n-line); background: var(--n-surface-2); color: var(--n-text);
+    border-radius: 13px; padding: 12px 4px; font-family: var(--sans); font-size: 11px; font-weight: 600; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 7px; transition: border-color 0.15s ease, transform 0.12s ease;
+  }
+  .share button:hover { border-color: rgba(255,255,255,0.24); }
+  .share button:active { transform: translateY(1px); }
+  .share button:focus-visible { outline: 2px solid var(--friend); outline-offset: 2px; }
+  .share .ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 13px; font-weight: 800; color: #fff; }
+  .reset {
+    display: block; margin: 14px auto 0; background: none; border: none; color: var(--n-mute);
+    font-size: 12.5px; font-family: var(--sans); cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+  }
+  .reset:focus-visible { outline: 2px solid var(--n-mute); outline-offset: 3px; border-radius: 4px; }
+
+  .hidden { display: none !important; }
+
+  .notes { max-width: 384px; width: 100%; background: var(--card); border: 1px solid var(--card-line); border-radius: 18px; padding: 20px 22px; }
+  .notes h2 { font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 14px; font-weight: 700; }
+  .notes ol { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 12px; }
+  .notes li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 1.5; }
+  .notes li .n {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 7px; background: rgba(255, 77, 109, 0.12);
+    color: var(--accent); display: grid; place-items: center; font-size: 12px; font-weight: 800; font-family: var(--mono);
+  }
+  .notes li b { font-weight: 700; }
+  .notes .foot { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--card-line); font-size: 12.5px; color: var(--ink-soft); line-height: 1.5; }
+  .notes .foot code {
+    font-family: var(--mono); font-size: 12px; background: color-mix(in srgb, var(--accent) 10%, transparent);
+    color: var(--accent); padding: 1px 6px; border-radius: 5px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+</style>
+
+<header class="masthead">
+  <p class="eyebrow">Proxi · Prototipo Fase 1</p>
+  <h1>Los últimos metros, en alta resolución.</h1>
+  <p>Haz <b>doble-tap</b> para fijar tu punto exacto y compártelo. Cuando tu cercano se acerca, el mapa <b>hace zoom solo</b> y carga más detalle. Prueba las capas <b>Satélite</b> y <b>Relieve</b> abajo a la derecha.</p>
+</header>
+
+<div class="phone">
+  <div class="screen">
+    <div class="statusbar">
+      <span>21:47</span>
+      <span class="dots"><i></i><i></i><i></i><span class="batt"></span></span>
+    </div>
+
+    <div class="appbar">
+      <div class="brand">
+        <span class="logo">Prox<span>i</span></span>
+        <span class="tag">modo preciso</span>
+      </div>
+      <span class="live"><b></b> EN VIVO</span>
+    </div>
+
+    <div class="map" id="map">
+      <canvas id="cv"></canvas>
+      <div class="hint" id="hint"><span class="tapicon"></span> Doble-tap para fijar tu punto exacto</div>
+      <div class="zoomtag" id="zoomtag">escala —</div>
+      <div class="layers" role="group" aria-label="Capa del mapa">
+        <button data-mode="dark" aria-pressed="true">Oscuro</button>
+        <button data-mode="sat" aria-pressed="false">Satélite</button>
+        <button data-mode="relief" aria-pressed="false">Relieve</button>
+      </div>
+    </div>
+
+    <div class="sheet">
+      <div class="grip"></div>
+      <div class="readout" id="readout">
+        <div class="puck" id="puck"><b></b></div>
+        <div class="txt">
+          <div class="lead" id="lead">Ubicándote…</div>
+          <div class="sub" id="sub">GPS aproximado · precisión ±15 m</div>
+        </div>
+        <div class="metric hidden" id="metric">
+          <div class="big" id="dist">—</div>
+          <div class="unit">metros</div>
+        </div>
+      </div>
+
+      <button class="cta" id="cta" disabled>
+        <span class="pin"></span> Fija tu punto para compartir
+      </button>
+
+      <div class="share hidden" id="shareRow">
+        <button><span class="ic" style="background:#25d366">W</span>WhatsApp</button>
+        <button><span class="ic" style="background:#3b6cf0">↗</span>Link</button>
+        <button><span class="ic" style="background:#ff4d6d">＋</span>Cercano</button>
+        <button><span class="ic" style="background:#8b5cf6">⤴</span>Más</button>
+      </div>
+
+      <button class="reset hidden" id="reset">Reiniciar demostración</button>
+    </div>
+  </div>
+</div>
+
+<section class="notes">
+  <h2>Qué estás viendo</h2>
+  <ol>
+    <li><span class="n">1</span><div><b>Zoom adaptativo:</b> al compartir, la cámara sigue a los dos pines y se acerca sola. A pocos metros aparece la <b>rejilla de 1 m</b> — el detalle que antes no cabía en pantalla.</div></li>
+    <li><span class="n">2</span><div><b>Capas de mapa:</b> abajo a la derecha cambias entre <b>Oscuro</b>, <b>Satélite</b> y <b>Relieve</b> — las mismas bases que ofrece Google Maps (y luego el 3D fotorrealista).</div></li>
+    <li><span class="n">3</span><div>La <b>barra de escala</b> (arriba a la izquierda) confirma cuánto detalle estás viendo, de ±15 m del GPS a metros reales.</div></li>
+  </ol>
+  <p class="foot">Simulación de la <b>Fase 1</b> del <code>PLAN.md</code>. En producción, la base sería el SDK de Google Maps (satélite/relieve/3D) y el zoom lo dispararía la distancia real entre personas.</p>
+</section>
+
+<script>
+(function () {
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d");
+  const mapEl = document.getElementById("map");
+  const hint = document.getElementById("hint");
+  const cta = document.getElementById("cta");
+  const shareRow = document.getElementById("shareRow");
+  const resetBtn = document.getElementById("reset");
+  const puck = document.getElementById("puck");
+  const lead = document.getElementById("lead");
+  const sub = document.getElementById("sub");
+  const metric = document.getElementById("metric");
+  const distEl = document.getElementById("dist");
+  const zoomtag = document.getElementById("zoomtag");
+  const layerBtns = document.querySelectorAll(".layers button");
+
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fontFam = () => getComputedStyle(document.body).fontFamily;
+  const METERS_ACROSS = 40;
+
+  let W = 0, H = 0, dpr = 1;
+  let mode = "dark";
+
+  // seeded generators
+  function makeRnd(s) { return function () { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; }; }
+  const rc = makeRnd(20260704);
+  const crowd = [];
+  for (let i = 0; i < 150; i++) {
+    const gx = rc(), gy = Math.pow(rc(), 0.8);
+    crowd.push({ x: gx, y: 0.16 + gy * 0.82, ph: rc() * Math.PI * 2, sp: 0.4 + rc() });
+  }
+  // satellite blobs
+  const rs = makeRnd(77123);
+  const blobs = [];
+  const satColors = ["#1d2a17", "#223016", "#2a2620", "#182414", "#26221c"];
+  for (let i = 0; i < 34; i++) {
+    blobs.push({ x: rs(), y: rs(), rx: 0.08 + rs() * 0.16, ry: 0.06 + rs() * 0.14, rot: rs() * Math.PI, c: satColors[(rs() * satColors.length) | 0] });
+  }
+
+  const gps = { x: 0.5, y: 0.52 };
+  let you = null, youReveal = 0;
+  let friend = null, friendTarget = null, shared = false;
+
+  // camera: world (normalized on full map) -> screen
+  const cam = { cx: 0.5, cy: 0.5, z: 1 };
+
+  function resize() {
+    const r = mapEl.getBoundingClientRect();
+    W = r.width; H = r.height; dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  new ResizeObserver(resize).observe(mapEl);
+  resize();
+
+  function sx(wx) { return (wx - cam.cx) * cam.z * W + W / 2; }
+  function sy(wy) { return (wy - cam.cy) * cam.z * H + H / 2; }
+  function m2px(m) { return m * W * cam.z / METERS_ACROSS; }
+  function worldDistM(a, b) {
+    const dx = (a.x - b.x) * W, dy = (a.y - b.y) * H;
+    return Math.sqrt(dx * dx + dy * dy) * (METERS_ACROSS / W);
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+
+  function drawBase(t) {
+    if (mode === "sat") {
+      ctx.fillStyle = "#0e150c"; ctx.fillRect(0, 0, W, H);
+      for (const b of blobs) {
+        ctx.save();
+        ctx.translate(sx(b.x), sy(b.y)); ctx.rotate(b.rot);
+        ctx.scale(m2px(1) ? 1 : 1, 1);
+        ctx.fillStyle = b.c; ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, b.rx * W * cam.z, b.ry * H * cam.z, 0, 0, Math.PI * 2);
+        ctx.fill(); ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+      // vignette
+      const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.2, W / 2, H / 2, H * 0.8);
+      vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,0.4)");
+      ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+    } else if (mode === "relief") {
+      ctx.fillStyle = "#15161d"; ctx.fillRect(0, 0, W, H);
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 16; i++) {
+        const base = i / 16;
+        ctx.strokeStyle = "rgba(196,166,120," + (0.10 + (i % 2) * 0.05) + ")";
+        ctx.beginPath();
+        for (let px = 0; px <= W; px += 8) {
+          const wx = (px - W / 2) / (cam.z * W) + cam.cx;
+          const wy = base + 0.05 * Math.sin(wx * 9 + i * 0.7) + 0.03 * Math.sin(wx * 22 + i);
+          const Y = sy(wy);
+          if (px === 0) ctx.moveTo(px, Y); else ctx.lineTo(px, Y);
+        }
+        ctx.stroke();
+      }
+    } else {
+      ctx.fillStyle = "#0b0e1a"; ctx.fillRect(0, 0, W, H);
+    }
+
+    // shared ambient glow from stage (all modes)
+    const gx = sx(0.5), gy = sy(0.055);
+    const g = ctx.createRadialGradient(gx, gy, 10, gx, gy, H * 0.9 * cam.z);
+    g.addColorStop(0, "rgba(242,178,92,0.10)");
+    g.addColorStop(0.4, "rgba(90,60,120,0.05)");
+    g.addColorStop(1, "rgba(11,14,26,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawStage() {
+    const x = sx(0.16), y = sy(0.03), w = sx(0.84) - sx(0.16), h = sy(0.085) - sy(0.03);
+    ctx.fillStyle = "rgba(242,178,92,0.16)"; roundRect(x, y, w, h, 8); ctx.fill();
+    if (h > 14) {
+      ctx.fillStyle = "rgba(242,178,92,0.55)";
+      ctx.font = "700 " + Math.min(11 * Math.sqrt(cam.z), 20) + "px " + fontFam();
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("ESCENARIO", x + w / 2, y + h / 2);
+    }
+  }
+
+  function drawGrid() {
+    if (cam.z < 2.2) return;
+    const a = Math.min(0.5, (cam.z - 2.2) / 3);
+    const step = m2px(1);
+    if (step < 12) return;
+    const ox = sx(you ? you.x : 0.5), oy = sy(you ? you.y : 0.5);
+    ctx.strokeStyle = "rgba(255,255,255," + a * 0.5 + ")"; ctx.lineWidth = 1;
+    for (let gx = ox % step; gx < W; gx += step) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
+    for (let gy = oy % step; gy < H; gy += step) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+  }
+
+  function drawScaleBar() {
+    const mpp = METERS_ACROSS / (W * cam.z);
+    const targets = [1, 2, 5, 10, 20];
+    let m = 20;
+    for (const c of targets) { if (c / mpp <= 90) { m = c; break; } }
+    zoomtag.textContent = "escala · " + m + " m";
+    zoomtag.classList.add("show");
+  }
+
+  function draw(t) {
+    ctx.clearRect(0, 0, W, H);
+
+    // camera target
+    let tz = 1, tcx = 0.5, tcy = 0.5;
+    if (shared && you && friend) {
+      const sepPx = Math.sqrt(Math.pow((you.x - friend.x) * W, 2) + Math.pow((you.y - friend.y) * H, 2));
+      tz = Math.max(1, Math.min(7, (0.42 * Math.min(W, H)) / Math.max(sepPx, 1)));
+      tcx = (you.x + friend.x) / 2; tcy = (you.y + friend.y) / 2;
+    }
+    const k = reduce ? 1 : 0.055;
+    cam.z += (tz - cam.z) * k; cam.cx += (tcx - cam.cx) * k; cam.cy += (tcy - cam.cy) * k;
+
+    drawBase(t);
+    drawStage();
+    drawGrid();
+
+    // crowd (constant screen size)
+    for (const p of crowd) {
+      const jitter = reduce ? 0 : Math.sin(t * 0.0011 * p.sp + p.ph) * 1.1;
+      const X = sx(p.x) + jitter, Y = sy(p.y) + (reduce ? 0 : Math.cos(t * 0.001 * p.sp + p.ph) * 0.8);
+      if (X < -6 || X > W + 6 || Y < -6 || Y > H + 6) continue;
+      ctx.beginPath(); ctx.arc(X, Y, 2.4, 0, Math.PI * 2);
+      ctx.fillStyle = mode === "sat" ? "rgba(180,190,210,0.6)" : "rgba(120,128,168,0.55)";
+      ctx.fill();
+    }
+
+    // GPS blur
+    const gpsAlpha = you ? Math.max(0, 0.5 - youReveal * 0.5) : (0.5 + (reduce ? 0 : Math.sin(t * 0.002) * 0.06));
+    if (gpsAlpha > 0.02) {
+      const gr = m2px(15), gx = sx(gps.x), gy = sy(gps.y);
+      const gg = ctx.createRadialGradient(gx, gy, gr * 0.15, gx, gy, gr);
+      gg.addColorStop(0, "rgba(120,150,255," + (0.20 * gpsAlpha) + ")");
+      gg.addColorStop(1, "rgba(120,150,255,0)");
+      ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(gx, gy, gr, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(150,170,255," + (0.35 * gpsAlpha) + ")";
+      ctx.setLineDash([4, 5]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(gx, gy, gr, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      if (gpsAlpha > 0.15) {
+        ctx.fillStyle = "rgba(180,195,255," + gpsAlpha + ")";
+        ctx.font = "600 10px " + fontFam(); ctx.textAlign = "center";
+        ctx.fillText("GPS ±15 m", gx, gy - gr - 7);
+      }
+    }
+
+    // connecting line + friend
+    if (friend && you) {
+      const yx = sx(you.x), yy = sy(you.y), fx = sx(friend.x), fy = sy(friend.y);
+      ctx.strokeStyle = "rgba(69,198,240,0.6)"; ctx.setLineDash([6, 6]); ctx.lineWidth = 2;
+      ctx.lineDashOffset = reduce ? 0 : -t * 0.02;
+      ctx.beginPath(); ctx.moveTo(yx, yy); ctx.lineTo(fx, fy); ctx.stroke(); ctx.setLineDash([]);
+      drawPin(fx, fy, "#45c6f0", 1);
+    }
+
+    // your precise pin + accuracy ring
+    if (you) {
+      const yx = sx(you.x), yy = sy(you.y);
+      const ar = m2px(1.5), pulse = reduce ? 1 : (1 + Math.sin(t * 0.004) * 0.12);
+      ctx.strokeStyle = "rgba(255,77,109,0.5)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(yx, yy, ar * pulse, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "rgba(255,77,109,0.10)";
+      ctx.beginPath(); ctx.arc(yx, yy, ar * pulse, 0, Math.PI * 2); ctx.fill();
+      if (ar > 26) {
+        ctx.fillStyle = "rgba(255,150,170,0.9)"; ctx.font = "600 9px " + fontFam(); ctx.textAlign = "center";
+        ctx.fillText("±1,5 m", yx, yy - ar - 5);
+      }
+      drawPin(yx, yy, "#ff4d6d", youReveal);
+    }
+
+    if (you && youReveal < 1) youReveal = Math.min(1, youReveal + 0.06);
+    if (friend && friendTarget && !reduce) {
+      friend.x += (friendTarget.x - friend.x) * 0.012;
+      friend.y += (friendTarget.y - friend.y) * 0.012;
+    }
+    if (shared) { distEl.textContent = fmtDist(worldDistM(you, friend)); }
+
+    drawScaleBar();
+    requestAnimationFrame(draw);
+  }
+
+  function fmtDist(m) { return m < 10 ? m.toFixed(1) : String(Math.round(m)); }
+
+  function drawPin(x, y, color, scale) {
+    const s = 0.4 + scale * 0.6;
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    ctx.shadowColor = color; ctx.shadowBlur = 16; ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0; ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(0, 0, 2.4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  }
+
+  // interaction
+  let lastTap = 0;
+  function place(clientX, clientY) {
+    const r = mapEl.getBoundingClientRect();
+    const snx = (clientX - r.left) / r.width, sny = (clientY - r.top) / r.height;
+    const wx = (snx - 0.5) / cam.z + cam.cx, wy = (sny - 0.5) / cam.z + cam.cy;
+    if (wx < 0 || wx > 1 || wy < 0.12 || wy > 1) return;
+    const first = !you; you = { x: wx, y: wy }; if (first) youReveal = 0;
+    hint.classList.add("gone"); cta.disabled = false;
+    puck.classList.remove("friend");
+    lead.textContent = "Tu punto exacto"; sub.textContent = "Fijado a mano · precisión ±1,5 m";
+    if (!shared) cta.innerHTML = '<span class="pin"></span> Compartir mi punto';
+  }
+  mapEl.addEventListener("dblclick", (e) => { e.preventDefault(); place(e.clientX, e.clientY); });
+  mapEl.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".layers")) return;
+    const now = e.timeStamp;
+    if (now - lastTap < 320) { place(e.clientX, e.clientY); lastTap = 0; } else lastTap = now;
+  });
+
+  layerBtns.forEach((b) => b.addEventListener("click", () => {
+    mode = b.dataset.mode;
+    layerBtns.forEach((o) => o.setAttribute("aria-pressed", o === b ? "true" : "false"));
+  }));
+
+  cta.addEventListener("click", () => {
+    if (!you || shared) return; shared = true;
+    const ang = -0.6, d0 = 18 / (METERS_ACROSS / W), d1 = 5 / (METERS_ACROSS / W);
+    friend = { x: you.x + (d0 / W) * Math.cos(ang), y: you.y + (d0 / H) * 0.7 };
+    friend.x = Math.min(0.9, Math.max(0.1, friend.x)); friend.y = Math.min(0.9, Math.max(0.2, friend.y));
+    friendTarget = { x: you.x + (friend.x - you.x) * (d1 / d0), y: you.y + (friend.y - you.y) * (d1 / d0) };
+    if (reduce) friend = { ...friendTarget };
+    cta.classList.add("hidden"); shareRow.classList.remove("hidden"); resetBtn.classList.remove("hidden");
+    metric.classList.remove("hidden"); puck.classList.add("friend");
+    lead.textContent = "Sofía va hacia ti"; sub.textContent = "Recibió tu punto · acercándose en vivo";
+  });
+
+  resetBtn.addEventListener("click", () => {
+    you = null; friend = null; friendTarget = null; shared = false; youReveal = 0;
+    cam.z = 1; cam.cx = 0.5; cam.cy = 0.5;
+    cta.classList.remove("hidden"); cta.disabled = true;
+    cta.innerHTML = '<span class="pin"></span> Fija tu punto para compartir';
+    shareRow.classList.add("hidden"); resetBtn.classList.add("hidden"); metric.classList.add("hidden");
+    puck.classList.remove("friend"); hint.classList.remove("gone");
+    lead.textContent = "Ubicándote…"; sub.textContent = "GPS aproximado · precisión ±15 m";
+  });
+
+  requestAnimationFrame(draw);
+})();
+</script>
