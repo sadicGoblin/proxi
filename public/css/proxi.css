@@ -42,9 +42,9 @@ body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--text);ove
 .status.warn b{background:#f2b25c}
 .status.hide{opacity:0;pointer-events:none}
 
-/* bottom sheet */
+/* bottom sheet (en pantallas anchas se centra en vez de ocupar todo el ancho) */
 .sheet{
-  position:absolute;left:0;right:0;bottom:0;z-index:1000;
+  position:absolute;left:0;right:0;bottom:0;z-index:1000;max-width:640px;margin:0 auto;
   background:linear-gradient(180deg,var(--surface),var(--bg));
   border-top:1px solid var(--line);border-radius:22px 22px 0 0;
   padding:14px 18px calc(env(safe-area-inset-bottom) + 16px);
@@ -85,19 +85,51 @@ body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--text);ove
 .placebar .ok{background:linear-gradient(180deg,#ffe08a,var(--flag));color:#3a2c00}
 .placebar .no{background:var(--surface2);color:var(--text);border:1px solid var(--line)}
 
-.namebar{display:flex;gap:9px;margin-top:12px}
-.namebar input{
-  flex:1;background:var(--surface2);border:1px solid var(--line);border-radius:12px;
-  color:var(--text);font-family:var(--sans);font-size:13.5px;padding:11px 13px;outline:none}
-.namebar input:focus{border-color:var(--friend)}
+/* modales (compartidos: hora, permisos y perfil) */
+.modal{position:absolute;inset:0;z-index:1200;display:none;place-items:center;background:rgba(5,7,16,.6);backdrop-filter:blur(4px)}
+.modal.on{display:grid}
+.card{width:min(92vw,360px);background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px}
+.card h3{margin:0 0 4px;font-size:16px}
+.card p{margin:0 0 14px;font-size:12.5px;color:var(--mute)}
+.card input[type="datetime-local"],.card input[type="text"]{
+  width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:12px;
+  color:var(--text);font-family:var(--sans);font-size:14px;padding:12px;outline:none;color-scheme:dark;margin-bottom:10px}
+.card input:focus{border-color:var(--friend)}
+.card .acts{display:flex;gap:9px;margin-top:6px}
+.card .acts button{flex:1;border:none;border-radius:12px;padding:12px;font:700 13.5px var(--sans);cursor:pointer}
+.card .acts .ok{background:linear-gradient(180deg,#ffe08a,var(--flag));color:#3a2c00}
+.card .acts .no{background:var(--surface2);color:var(--text);border:1px solid var(--line)}
+
+/* perfil (avatar en topbar + modal) */
+.avatarbtn{
+  pointer-events:auto;width:36px;height:36px;flex:0 0 auto;border-radius:50%;cursor:pointer;padding:0;
+  border:2px solid rgba(255,255,255,.35);background:var(--surface2) center/cover no-repeat;
+  color:var(--text);font:800 14px var(--sans);display:grid;place-items:center;
+  box-shadow:0 4px 14px -4px rgba(0,0,0,.6)}
+.profrow{display:flex;gap:11px;align-items:flex-start;margin-bottom:4px}
+.profav{width:46px;height:46px;border-radius:50%;flex:0 0 auto;border:2px solid var(--line);
+  background:var(--surface2) center/cover no-repeat;display:grid;place-items:center;font:800 18px var(--sans)}
+.profrow input{flex:1;min-width:0}
+.gbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;border:none;border-radius:12px;
+  padding:12px;font:700 14px var(--sans);cursor:pointer;background:#fff;color:#1f1f1f}
+.gbtn.out{background:var(--surface2);color:var(--text);border:1px solid var(--line)}
+.gbtn:disabled{opacity:.6}
+.profmail{margin:10px 0 0!important;font-size:11.5px;text-align:center}
 
 /* leaflet marker labels */
 .pin{width:20px;height:20px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.35),0 0 14px var(--gl)}
 .pin.you{background:var(--you);--gl:rgba(255,77,109,.9)}
 .pin.friend{background:var(--friend);--gl:rgba(69,198,240,.9)}
+/* con foto de perfil (Google): la foto reemplaza el punto */
+.pin.haspic{width:34px;height:34px;background-size:cover;background-position:center;border-width:2px}
+.pin.you.haspic{border-color:var(--you)}
+.pin.friend.haspic{border-color:var(--friend)}
+.pin.haspic .plabel{top:-27px}
 .plabel{position:absolute;top:-24px;left:50%;transform:translateX(-50%);white-space:nowrap;
   font:700 11px var(--sans);color:#fff;background:rgba(10,13,26,.85);padding:2px 7px;border-radius:6px;border:1px solid var(--line)}
 .leaflet-container{background:#0b0e1a;font-family:var(--sans)}
+/* los controles de Leaflet (zoom y capas) bajan para no quedar debajo de la topbar */
+.leaflet-top{top:calc(env(safe-area-inset-top) + 56px)}
 .leaflet-control-attribution{font-size:9px;background:rgba(10,13,26,.6)!important;color:var(--mute)!important}
 .leaflet-control-attribution a{color:var(--friend)!important}
 .leaflet-bar a{background:var(--surface)!important;color:var(--text)!important;border-color:var(--line)!important}

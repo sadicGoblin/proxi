@@ -9,14 +9,35 @@ service cloud.firestore {
     match /salas/{sala}/miembros/{uid} {
       allow read: if request.auth != null;
       allow create, update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name','lat','lng','acc','precise','ts','t','expireAt'])
+        && request.resource.data.keys().hasOnly(['name','photo','lat','lng','acc','precise','ts','t','expireAt'])
         && request.resource.data.name is string && request.resource.data.name.size() <= 24
+        // foto de perfil (Google Sign-In): opcional, solo URL https corta
+        && (request.resource.data.photo == null
+            || (request.resource.data.photo is string
+                && request.resource.data.photo.size() <= 300
+                && request.resource.data.photo.matches('https://.*')))
         && request.resource.data.lat is number && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
         && request.resource.data.lng is number && request.resource.data.lng >= -180 && request.resource.data.lng <= 180
         && request.resource.data.acc is number
         && request.resource.data.precise is bool
         && request.resource.data.expireAt is timestamp;
       allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ── Ruta del grupo (dibujada a mano; cualquiera del grupo la edita) ──
+    // Se guardan solo los puntos marcados; el trazado por calles lo pide
+    // cada cliente a OSRM. Todo cambio queda en el historial de la junta.
+    match /salas/{sala}/ruta/actual {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.resource.data.keys().hasOnly(['pts','profile','by','byUid','t','ts','expireAt'])
+        && request.resource.data.pts is list
+        && request.resource.data.pts.size() >= 2 && request.resource.data.pts.size() <= 30
+        && request.resource.data.profile in ['foot','bike','car']
+        && request.resource.data.by is string && request.resource.data.by.size() <= 24
+        && request.resource.data.byUid == request.auth.uid
+        && request.resource.data.expireAt is timestamp;
+      allow delete: if request.auth != null;
     }
 
     // ── La junta (punto + hora + gobernanza) ────────────────────────────

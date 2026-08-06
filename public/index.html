@@ -75,7 +75,8 @@
       <span class="logo">Prox<span>i</span></span>
       <span class="room" id="roomLabel">sala ·</span>
     </div>
-    <div style="display:flex;gap:8px;pointer-events:auto">
+    <div style="display:flex;gap:8px;align-items:center;pointer-events:auto">
+      <button class="avatarbtn" id="avatarBtn" aria-label="Tu perfil"></button>
       <a class="share" id="juntaBtn" style="background:linear-gradient(180deg,#ffe08a,#ffd166);color:#3a2c00;box-shadow:0 8px 20px -8px rgba(255,209,102,.7);text-decoration:none">🚩 Junta</a>
       <button class="share" id="shareBtn">Compartir sala</button>
     </div>
@@ -129,9 +130,6 @@
       <button id="preciseBtn"><span class="dotc"></span>Fijar mi punto exacto</button>
       <button id="gpsBtn" class="on">Usar mi GPS</button>
     </div>
-    <div class="namebar">
-      <input id="nameInput" maxlength="18" placeholder="Tu nombre" autocomplete="off" />
-    </div>
   </div>
 
   <div class="landing" id="landing">
@@ -147,7 +145,7 @@
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script type="module">
     import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { db, rnd, ensureAuth, initName, esc, haversine, createPresence, registerSW, STALE_MS } from "./js/core.js";
+    import { db, rnd, ensureAuth, setupProfile, initBasemaps, photoOf, esc, haversine, createPresence, registerSW, STALE_MS } from "./js/core.js";
 
     registerSW();
 
@@ -165,18 +163,13 @@
     async function startApp(room){
       const uid = await ensureAuth();
       document.getElementById("roomLabel").textContent = "sala · " + room;
-      const getName = initName(document.getElementById("nameInput"), uid, () => pushNow());
+      // Perfil: nombre + Google opcional (foto en el mapa)
+      const profile = setupProfile({ btn: document.getElementById("avatarBtn"), onChange: () => pushNow() });
+      const getName = profile.getName;
 
       // ---- map ----
       const map = L.map("map", { zoomControl:true, attributionControl:true, tap:true }).setView([-33.4489,-70.6693], 3);
-      const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-        maxZoom:22, maxNativeZoom:19, attribution:"Imagery © Esri" });
-      const relief = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}", {
-        maxZoom:22, maxNativeZoom:13, attribution:"Relieve © Esri" });
-      const streets = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        maxZoom:22, maxNativeZoom:20, attribution:"© OpenStreetMap, © CARTO" });
-      sat.addTo(map);
-      L.control.layers({ "Satélite":sat, "Relieve":relief, "Oscuro":streets }, null, { position:"topright" }).addTo(map);
+      initBasemaps(map);
 
       // ---- follow mode (auto by default) ----
       let follow = true;
@@ -253,14 +246,19 @@
       // ---- presencia (Firestore, con expiración y limpieza al salir) ----
       let dbReady = false;
       const { pushNow } = createPresence({
-        room, uid, getName, getPos: myPos,
+        room, uid, getName, getPhoto: profile.getPhoto, getPos: myPos,
         onOk(){ if(!dbReady){ dbReady = true; setStatus("Compartiendo en vivo", true); setTimeout(()=>status.classList.add("hide"), 2500); } },
         onErr(){ setStatus("Sala aún no activa (falta habilitar la base de datos)", false); }
       });
 
       // ---- render members ----
       const markers = new Map();
-      function mkIcon(kind, label){ return L.divIcon({ className:"", html:`<div class="pin ${kind}"><span class="plabel">${esc(label)}</span></div>`, iconSize:[20,20], iconAnchor:[10,10] }); }
+      function mkIcon(kind, label, photo){
+        const cls = `pin ${kind}` + (photo ? " haspic" : "");
+        const st = photo ? ` style="background-image:url('${photo}')"` : "";   // photo ya viene saneada (photoOf)
+        const size = photo ? 34 : 20, half = size/2;
+        return L.divIcon({ className:"", html:`<div class="${cls}"${st}><span class="plabel">${esc(label)}</span></div>`, iconSize:[size,size], iconAnchor:[half,half] });
+      }
       let accCircle = null;
 
       onSnapshot(collection(db,"salas",room,"miembros"), snap => {
@@ -273,9 +271,10 @@
           const isMe = d.id === uid;
           const ll = [m.lat, m.lng];
           pts.push(ll);
+          const icon = mkIcon(isMe?"you":"friend", isMe?"tú":(m.name||"amigo"), photoOf(m));
           let mk = markers.get(d.id);
-          if(!mk){ mk = L.marker(ll, { icon:mkIcon(isMe?"you":"friend", isMe?"tú":(m.name||"amigo")) }).addTo(map); markers.set(d.id, mk); }
-          else { mk.setLatLng(ll); mk.setIcon(mkIcon(isMe?"you":"friend", isMe?"tú":(m.name||"amigo"))); }
+          if(!mk){ mk = L.marker(ll, { icon }).addTo(map); markers.set(d.id, mk); }
+          else { mk.setLatLng(ll); mk.setIcon(icon); }
           if(isMe){ me = m;
             if(accCircle) map.removeLayer(accCircle);
             accCircle = L.circle(ll, { radius:Math.max(m.acc||10,1.5), color:"#ff4d6d", weight:1, fillColor:"#ff4d6d", fillOpacity:.08 }).addTo(map);

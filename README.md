@@ -53,6 +53,7 @@ Para que Firestore los borre solo, habilita la política TTL una vez por grupo d
 gcloud firestore fields ttls update expireAt --collection-group=miembros --enable-ttl --project=proxi-live
 gcloud firestore fields ttls update expireAt --collection-group=junta    --enable-ttl --project=proxi-live
 gcloud firestore fields ttls update expireAt --collection-group=cambios  --enable-ttl --project=proxi-live
+gcloud firestore fields ttls update expireAt --collection-group=ruta     --enable-ttl --project=proxi-live
 ```
 
 Mientras tanto el cliente ya ignora posiciones con más de 90 s de antigüedad, así que un doc
@@ -61,15 +62,26 @@ huérfano nunca se muestra aunque aún no se haya borrado.
 ## Autenticación (hacer una vez en la consola)
 
 La app usa **Anonymous Auth** (sesión invisible, sin registro) y las reglas de Firestore la
-exigen. Habilitarla una vez:
-**Consola Firebase → proxi-live → Authentication → Comenzar → Sign-in method → Anónimo → Habilitar.**
-Sin esto, la app no puede conectarse a la base de datos.
+exigen. Además, desde el perfil (avatar arriba a la derecha) el usuario puede **iniciar sesión
+con Google** — opcional: su foto reemplaza el punto en el mapa y su rol de organizador
+sobrevive a borrar los datos del navegador (se vincula a la sesión anónima conservando el uid).
+
+Habilitar ambos proveedores una vez:
+**Consola Firebase → proxi-live → Authentication → Sign-in method →**
+1. **Anónimo → Habilitar** (sin esto, la app no puede conectarse a la base de datos).
+2. **Google → Habilitar** (elige un correo de soporte y guarda). Sin esto, el botón
+   "Continuar con Google" del perfil mostrará un error.
+
+Los dominios `proxi-live.web.app`, `proxi-live.firebaseapp.com` y `localhost` ya vienen
+autorizados por defecto; si sirves desde otro dominio, agrégalo en
+**Authentication → Settings → Authorized domains**.
 
 ## Estado de seguridad
 
-- [`firestore.rules`](firestore.rules): requieren sesión, validan esquema y hacen cumplir los
-  roles de la junta (solo el organizador mueve, salvo que delegue; liberación a las 24 h de
-  inactividad). Diseño y decisiones en [`JUNTA.md`](JUNTA.md).
-- Ronda 2 pendiente: Google Sign-In opcional para que el rol de organizador sobreviva a borrar
-  los datos del navegador.
+- [`firestore.rules`](firestore.rules): requieren sesión, validan esquema (incluida la foto de
+  perfil: solo URL https corta) y hacen cumplir los roles de la junta (solo el organizador
+  mueve, salvo que delegue; liberación a las 24 h de inactividad). Diseño y decisiones en
+  [`JUNTA.md`](JUNTA.md).
+- Ronda 2 (Google Sign-In opcional): ✅ hecha — vincular conserva el uid; si la cuenta Google
+  ya existía, se entra con ella (uid nuevo) y la página se recarga.
 - La app Flutter (`pair/`, en pausa) quedó sin acceso a Firestore hasta que adopte auth.

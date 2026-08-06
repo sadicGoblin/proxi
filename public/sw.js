@@ -1,6 +1,6 @@
 // Proxi — service worker: deja el "app shell" disponible offline y acelera cargas.
 // Sube la versión al cambiar cualquier archivo del shell.
-const CACHE = "proxi-v2";
+const CACHE = "proxi-v7";
 const SHELL = [
   "/", "/index.html", "/junta.html",
   "/css/proxi.css", "/js/core.js",
