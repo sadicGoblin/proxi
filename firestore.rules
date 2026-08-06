@@ -2,13 +2,70 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── SOLO PARA LA PRUEBA ──────────────────────────────────────────────
-    // Abierto para poder probar entre 2 personas sin login.
-    // ANTES de producción: cerrar con autenticación y validación por sala.
-    // (ver MODELO-NEGOCIO.md §6 — privacidad y Ley 21.719)
-    // Cubre miembros/ (ubicaciones) y pair/ (intercambio de parámetros UWB).
-    match /salas/{sala}/{document=**} {
-      allow read, write: if true;
+    // Requiere sesión (Anonymous Auth): el uid ya no se puede falsificar.
+    // Nota: la app Flutter (pair/, en pausa) queda sin acceso hasta que adopte auth.
+
+    // ── Posiciones en vivo ──────────────────────────────────────────────
+    match /salas/{sala}/miembros/{uid} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name','lat','lng','acc','precise','ts','t','expireAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 24
+        && request.resource.data.lat is number && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
+        && request.resource.data.lng is number && request.resource.data.lng >= -180 && request.resource.data.lng <= 180
+        && request.resource.data.acc is number
+        && request.resource.data.precise is bool
+        && request.resource.data.expireAt is timestamp;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ── La junta (punto + hora + gobernanza) ────────────────────────────
+    match /salas/{sala}/junta/actual {
+      function d(){ return resource.data; }
+      function nd(){ return request.resource.data; }
+      function isOwner(){ return request.auth.uid == d().ownerUid; }
+      function canEdit(){
+        return isOwner()
+          || d().policy == 'all'
+          || (d().policy == 'editors' && request.auth.uid in d().editors);
+      }
+      // P1: si nadie con permiso toca la junta en 24 h, se libera (cualquiera puede
+      // editarla e incluso reclamarla como nuevo organizador).
+      function adminInactivo(){ return request.time > d().ts + duration.value(24, 'h'); }
+      // Quien edita sin ser el organizador no puede tocar la gobernanza.
+      function keepsGovernance(){
+        return nd().ownerUid == d().ownerUid && nd().policy == d().policy && nd().editors == d().editors;
+      }
+      function validShape(){
+        return nd().keys().hasOnly(['lat','lng','when','title','ownerUid','policy','editors','by','byUid','t','ts','expireAt'])
+          && nd().keys().hasAll(['lat','lng','ownerUid','policy','editors','by','byUid','t','ts','expireAt'])
+          && nd().policy in ['owner','editors','all']
+          && nd().editors is list && nd().editors.size() <= 50
+          && (nd().when == null || nd().when is number)
+          && nd().title is string && nd().title.size() <= 40
+          && nd().by is string && nd().by.size() <= 24
+          && nd().byUid == request.auth.uid
+          && nd().expireAt is timestamp;
+      }
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && validShape() && nd().ownerUid == request.auth.uid;
+      allow update: if request.auth != null && validShape()
+        && ( !('ownerUid' in d())               // junta anterior a los roles: se adopta
+          || isOwner()
+          || (canEdit() && keepsGovernance())
+          || adminInactivo() );
+      allow delete: if request.auth != null
+        && ( !('ownerUid' in d()) || isOwner() || adminInactivo() );
+
+      // Historial de cambios (y avisos "quiere mover la junta")
+      match /cambios/{cambio} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+          && request.resource.data.keys().hasOnly(['by','what','t','ts','expireAt'])
+          && request.resource.data.by is string && request.resource.data.by.size() <= 24
+          && request.resource.data.what is string && request.resource.data.what.size() <= 80
+          && request.resource.data.expireAt is timestamp;
+      }
     }
   }
 }

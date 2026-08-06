@@ -11,7 +11,8 @@
 - **[`MODELO-NEGOCIO.md`](MODELO-NEGOCIO.md)** — cómo se vende y monetiza (investigación de mercado).
 - **[`RECINTOS.md`](RECINTOS.md)** — línea B2B: mapear el recinto con video para reconocimiento visual (VPS privado).
 - **[`UWB.md`](UWB.md)** — el "metro final" premium: UWB en app nativa para verse a ~10 cm (solo gama alta).
-- **[`FARO.md`](FARO.md)** ⭐ — el "metro final" **universal, sin UWB**: baliza óptica (la retina cierra el último metro). El concepto más fuerte.
+- **[`FARO.md`](FARO.md)** — baliza óptica para el "metro final". **Descartado tras prueba en terreno (2026-08-06)**; queda como registro.
+- **[`JUNTA.md`](JUNTA.md)** ⭐ — foco actual: compartir bien, marcar bien y **junta con roles/permisos** (spec en análisis).
 - **[`prototipo.html`](prototipo.html)** — maqueta visual interactiva (concepto).
 - **[`public/`](public/)** — web app real desplegada en Firebase para probar entre 2 personas.
 - **[`public/junta.html`](public/junta.html)** 🚩 — **Junta del grupo**: punto de encuentro + hora compartidos por sala; cualquiera lo mueve o cambia la hora y todo el grupo lo ve al instante (con historial de cambios). Sin instalar nada, solo un link.
@@ -113,7 +114,17 @@ Esto **no necesita cámara, ni AR, ni 3D todavía**. Es construible y ya es úti
 
 ---
 
-## 6.1 Decisiones tomadas (2026-07-04)
+## 6.1 Decisiones tomadas
+
+**2026-08-06:**
+- **Faro (baliza óptica) descartado** tras la prueba en terreno: no funcionó.
+- Mientras se investiga la mejor vía para precisión, el foco es **hacer impecable lo básico**:
+  compartir ubicación, marcar el punto, y la **junta con roles** (solo el creador la mueve salvo
+  que delegue) → spec en [`JUNTA.md`](JUNTA.md).
+- La web app ahora es **PWA** (instalable, shell offline), con landing, código compartido
+  (`public/js/core.js`, `public/css/proxi.css`) y **expiración automática de datos** (`expireAt` + TTL).
+
+**2026-07-04:**
 
 - **Plataforma:** móvil **iOS + Android** (un solo código con Flutter o React Native).
 - **Cómo construir:** **prototipo visual primero** — maqueta clicable antes de código real. → ver [`prototipo.html`](prototipo.html).

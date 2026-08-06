@@ -1,5 +1,9 @@
 # Proxi Faro — "El último metro lo resuelve la retina, no el radio"
 
+> **⛔ ESTADO (2026-08-06): DESCARTADO.** La prueba en terreno de la baliza óptica no funcionó y
+> no se seguirá por esta vía. El documento queda solo como registro de la investigación.
+> El foco actual está en [`JUNTA.md`](JUNTA.md): compartir bien, marcar bien y la junta con roles.
+
 > Concepto para resolver el "último metro" **sin UWB, en cualquier teléfono**, y sobreviviendo a
 > un concierto ruidoso. Resultado de una investigación multi-agente (7 vías exploradas + filtro
 > adversarial). Documento separado de [`PLAN.md`](PLAN.md) · relacionado con [`UWB.md`](UWB.md)

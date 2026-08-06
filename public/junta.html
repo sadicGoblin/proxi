@@ -5,51 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#0b0e1a" />
   <title>Proxi — Junta del grupo</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚩</text></svg>" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="css/proxi.css" />
   <style>
-    :root{
-      --bg:#0b0e1a; --surface:#12172a; --surface2:#1a2039; --line:rgba(255,255,255,.10);
-      --text:#edeff7; --mute:#8e94b0; --you:#ff4d6d; --friend:#45c6f0; --flag:#ffd166;
-      --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
-      --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,monospace;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--text);overflow:hidden;-webkit-tap-highlight-color:transparent}
-    #map{position:absolute;inset:0;background:#0b0e1a}
-
-    .topbar{
-      position:absolute;top:0;left:0;right:0;z-index:1000;
-      display:flex;align-items:center;justify-content:space-between;gap:10px;
-      padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;
-      background:linear-gradient(180deg,rgba(11,14,26,.92),rgba(11,14,26,0));
-      pointer-events:none;
-    }
-    .brand{display:flex;align-items:baseline;gap:8px;pointer-events:auto}
-    .brand .logo{font-size:20px;font-weight:800;letter-spacing:-.04em}
-    .brand .logo span{color:var(--you)}
-    .brand .room{font-family:var(--mono);font-size:11px;color:var(--mute);letter-spacing:.05em}
-    .share{
-      pointer-events:auto;display:inline-flex;align-items:center;gap:7px;border:none;cursor:pointer;
-      background:linear-gradient(180deg,#ff607d,var(--you));color:#fff;font-family:var(--sans);
-      font-size:13.5px;font-weight:700;padding:9px 14px;border-radius:12px;
-      box-shadow:0 8px 20px -8px rgba(255,77,109,.8);
-    }
-    .share:active{transform:translateY(1px)}
-
-    .status{
-      position:absolute;top:calc(env(safe-area-inset-top) + 58px);left:50%;transform:translateX(-50%);
-      z-index:1000;font-size:12px;font-weight:600;color:var(--text);
-      background:rgba(10,13,26,.82);border:1px solid var(--line);backdrop-filter:blur(8px);
-      padding:7px 13px;border-radius:999px;display:flex;align-items:center;gap:8px;white-space:nowrap;
-      transition:opacity .3s;max-width:92vw;
-    }
-    .status b{width:7px;height:7px;border-radius:50%;background:var(--friend);flex:0 0 auto}
-    .status.warn b{background:#f2b25c}
-    .status.hide{opacity:0;pointer-events:none}
-
     /* aviso de cambio (toast) */
     .toast{
       position:absolute;top:calc(env(safe-area-inset-top) + 96px);left:50%;transform:translateX(-50%) translateY(-8px);
@@ -63,40 +24,8 @@
     .toast .tx{font-size:13px;font-weight:600;line-height:1.35}
     .toast .tx small{display:block;color:var(--mute);font-weight:500;font-size:11.5px;margin-top:2px}
 
-    /* crosshair para colocar el punto */
-    .cross{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:900;pointer-events:none;display:none}
-    .cross.on{display:block}
-    .cross svg{filter:drop-shadow(0 2px 8px rgba(0,0,0,.6))}
-    .placebar{
-      position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 24px);
-      z-index:1100;display:none;gap:9px;padding:10px;border-radius:16px;
-      background:rgba(10,13,26,.9);border:1px solid var(--line);backdrop-filter:blur(10px);
-    }
-    .placebar.on{display:flex}
-    .placebar button{border:none;border-radius:11px;padding:11px 16px;font:700 13.5px var(--sans);cursor:pointer}
-    .placebar .ok{background:linear-gradient(180deg,#ffe08a,var(--flag));color:#3a2c00}
-    .placebar .no{background:var(--surface2);color:var(--text);border:1px solid var(--line)}
-
-    /* bottom sheet */
-    .sheet{
-      position:absolute;left:0;right:0;bottom:0;z-index:1000;
-      background:linear-gradient(180deg,var(--surface),var(--bg));
-      border-top:1px solid var(--line);border-radius:22px 22px 0 0;
-      padding:14px 18px calc(env(safe-area-inset-bottom) + 16px);
-      box-shadow:0 -18px 40px -24px rgba(0,0,0,.7);
-      transition:transform .25s;
-    }
-    .sheet.away{transform:translateY(110%)}
-    .grip{width:36px;height:4px;border-radius:3px;background:rgba(255,255,255,.18);margin:0 auto 14px}
-    .row{display:flex;align-items:center;gap:13px}
-    .puck{width:42px;height:42px;border-radius:13px;flex:0 0 auto;display:grid;place-items:center;font-size:20px;
-      background:rgba(255,209,102,.14);border:1px solid rgba(255,209,102,.35)}
-    .info{flex:1;min-width:0}
-    .info .lead{font-size:14.5px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .info .sub{font-size:12px;color:var(--mute);margin-top:2px}
-    .metric{text-align:right;flex:0 0 auto}
-    .metric .big{font-family:var(--mono);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.02em}
-    .metric .unit{font-size:10.5px;color:var(--mute);margin-top:4px;letter-spacing:.05em}
+    /* puck (colores de esta página) */
+    .puck{background:rgba(255,209,102,.14);border-color:rgba(255,209,102,.35);font-size:20px}
 
     .timechips{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
     .chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;
@@ -104,14 +33,11 @@
     .chip.hot{border-color:rgba(255,209,102,.45);background:rgba(255,209,102,.1);color:#ffe4a1}
     .chip.soon{border-color:rgba(95,208,138,.45);background:rgba(95,208,138,.1);color:#8ce0ab}
     .chip.late{border-color:rgba(242,178,92,.45);background:rgba(242,178,92,.12);color:#f2b25c}
+    .chip.perm{cursor:default}
+    .chip.perm.mine{cursor:pointer;border-color:rgba(69,198,240,.45);background:rgba(69,198,240,.1);color:#9bdcf2}
 
-    .controls{display:flex;gap:9px;margin-top:14px}
-    .controls button{
-      flex:1;border:1px solid var(--line);background:var(--surface2);color:var(--text);
-      border-radius:12px;padding:11px 8px;font-family:var(--sans);font-size:12.5px;font-weight:700;cursor:pointer;
-      display:flex;align-items:center;justify-content:center;gap:7px}
-    .controls button:active{transform:translateY(1px)}
     .controls button.main{border-color:rgba(255,209,102,.5);background:rgba(255,209,102,.12);color:#ffe4a1}
+    .controls button.key{flex:0 0 auto;padding:11px 13px}
 
     .hist{margin-top:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface2);overflow:hidden;display:none}
     .hist.on{display:block}
@@ -121,13 +47,7 @@
     .hist li b{color:#ffe4a1;font-weight:700}
     .hist li small{color:var(--mute)}
 
-    .namebar{display:flex;gap:9px;margin-top:12px}
-    .namebar input{
-      flex:1;background:var(--surface2);border:1px solid var(--line);border-radius:12px;
-      color:var(--text);font-family:var(--sans);font-size:13.5px;padding:11px 13px;outline:none}
-    .namebar input:focus{border-color:var(--friend)}
-
-    /* modal hora */
+    /* modales (hora y permisos) */
     .modal{position:absolute;inset:0;z-index:1200;display:none;place-items:center;background:rgba(5,7,16,.6);backdrop-filter:blur(4px)}
     .modal.on{display:grid}
     .card{width:min(92vw,360px);background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px}
@@ -141,20 +61,20 @@
     .card .acts .ok{background:linear-gradient(180deg,#ffe08a,var(--flag));color:#3a2c00}
     .card .acts .no{background:var(--surface2);color:var(--text);border:1px solid var(--line)}
 
-    /* pins */
-    .pin{width:20px;height:20px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.35),0 0 14px var(--gl)}
-    .pin.you{background:var(--you);--gl:rgba(255,77,109,.9)}
-    .pin.friend{background:var(--friend);--gl:rgba(69,198,240,.9)}
-    .plabel{position:absolute;top:-24px;left:50%;transform:translateX(-50%);white-space:nowrap;
-      font:700 11px var(--sans);color:#fff;background:rgba(10,13,26,.85);padding:2px 7px;border-radius:6px;border:1px solid var(--line)}
+    .polopts{display:grid;gap:8px;margin-bottom:12px}
+    .polopts label{display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:600;
+      background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer}
+    .polopts input{accent-color:var(--flag)}
+    .memlist{list-style:none;margin:0 0 4px;padding:0;max-height:150px;overflow:auto;display:none}
+    .memlist.on{display:block}
+    .memlist li label{display:flex;align-items:center;gap:10px;font-size:13px;padding:8px 4px;cursor:pointer;
+      border-top:1px solid rgba(255,255,255,.05)}
+    .memlist input{accent-color:var(--flag)}
+    .memlist .none{color:var(--mute);font-size:12.5px;padding:8px 4px}
+
+    /* bandera de la junta */
     .flagpin{position:relative;font-size:30px;line-height:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,.55))}
     .flagpin .plabel{top:-20px;border-color:rgba(255,209,102,.5)}
-    .leaflet-container{background:#0b0e1a;font-family:var(--sans)}
-    .leaflet-control-attribution{font-size:9px;background:rgba(10,13,26,.6)!important;color:var(--mute)!important}
-    .leaflet-control-attribution a{color:var(--friend)!important}
-    .leaflet-bar a{background:var(--surface)!important;color:var(--text)!important;border-color:var(--line)!important}
-    .leaflet-control-layers{background:rgba(10,13,26,.85)!important;color:var(--text)!important;border:1px solid var(--line)!important;border-radius:12px!important;backdrop-filter:blur(10px)}
-    .leaflet-control-layers-toggle{background-color:var(--surface)!important}
   </style>
 </head>
 <body>
@@ -205,12 +125,14 @@
       <span class="chip hot" id="chipWhen">🕒 —</span>
       <span class="chip" id="chipCount">—</span>
       <span class="chip" id="chipPeople">👥 solo tú</span>
+      <span class="chip perm" id="chipPerm" style="display:none">🔒</span>
     </div>
 
     <div class="controls">
       <button class="main" id="setPointBtn">🚩 Fijar la junta aquí</button>
       <button id="setTimeBtn">🕒 Hora</button>
-      <button id="histBtn">📜</button>
+      <button class="key" id="permBtn" style="display:none">🔑</button>
+      <button class="key" id="histBtn">📜</button>
     </div>
 
     <div class="hist" id="hist">
@@ -236,38 +158,48 @@
     </div>
   </div>
 
+  <div class="modal" id="permModal">
+    <div class="card">
+      <h3>¿Quién puede mover la junta?</h3>
+      <p>El punto y la hora solo los cambia quien tú permitas. Todo cambio queda en el historial.</p>
+      <div class="polopts">
+        <label><input type="radio" name="pol" value="owner" /> 🔒 Solo yo</label>
+        <label><input type="radio" name="pol" value="editors" /> 🔑 Yo + quienes marque</label>
+        <label><input type="radio" name="pol" value="all" /> 🔓 Todos en el grupo</label>
+      </div>
+      <ul class="memlist" id="memList"></ul>
+      <div class="acts">
+        <button class="no" id="permNo">Cancelar</button>
+        <button class="ok" id="permOk">Guardar</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, doc, setDoc, deleteDoc, addDoc, collection, onSnapshot,
-             query, orderBy, limit, serverTimestamp }
+    import { doc, setDoc, addDoc, collection, onSnapshot, query, orderBy, limit, serverTimestamp }
       from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { db, rnd, ensureAuth, initName, esc, haversine, createPresence, registerSW, STALE_MS, expireAt }
+      from "./js/core.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCiqAsxD7_Me22aGHT9SO_AnRkJFyC5Xaw",
-      authDomain: "proxi-live.firebaseapp.com",
-      projectId: "proxi-live",
-      storageBucket: "proxi-live.firebasestorage.app",
-      messagingSenderId: "188965732831",
-      appId: "1:188965732831:web:dd1eced1c6ce771c1ac46a"
-    };
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    registerSW();
 
-    // ---- identidad + sala (mismas claves que index.html: interoperan) ----
-    const rnd = n => Array.from({length:n}, () => "abcdefghjkmnpqrstuvwxyz23456789"[Math.floor(Math.random()*30)]).join("");
-    let uid = localStorage.getItem("proxi_uid");
-    if(!uid){ uid = rnd(9); localStorage.setItem("proxi_uid", uid); }
+    const status = document.getElementById("status");
+    const statusTxt = document.getElementById("statusTxt");
+    function setStatus(t, ok=true){ statusTxt.textContent = t; status.classList.toggle("warn", !ok); status.classList.remove("hide"); }
+
+    // ---- identidad (Anonymous Auth) + sala ----
+    let uid;
+    try{ uid = await ensureAuth(); }
+    catch(e){ setStatus("No se pudo iniciar sesión · reintenta en un momento", false); throw e; }
+
     const url = new URL(location.href);
     let room = url.searchParams.get("s");
     if(!room){ room = rnd(5); url.searchParams.set("s", room); history.replaceState(null,"",url); }
     document.getElementById("roomLabel").textContent = "junta · " + room;
 
-    let name = localStorage.getItem("proxi_name") || ("Invitado-" + rnd(3));
-    const nameInput = document.getElementById("nameInput");
-    nameInput.value = name;
-    nameInput.addEventListener("input", () => { name = nameInput.value.trim() || ("Invitado-"+uid.slice(0,3)); localStorage.setItem("proxi_name", name); pushNow(); });
+    const getName = initName(document.getElementById("nameInput"), uid, () => pushNow());
 
     // ---- mapa ----
     const map = L.map("map", { zoomControl:true, attributionControl:true, tap:true }).setView([-33.4489,-70.6693], 3);
@@ -279,11 +211,7 @@
     L.control.layers({ "Satélite":sat, "Oscuro":streets }, null, { position:"topright" }).addTo(map);
     map.doubleClickZoom.disable();
 
-    const status = document.getElementById("status");
-    const statusTxt = document.getElementById("statusTxt");
-    function setStatus(t, ok=true){ statusTxt.textContent = t; status.classList.toggle("warn", !ok); status.classList.remove("hide"); }
-
-    // ---- mi ubicación en vivo (misma colección miembros que index.html) ----
+    // ---- mi ubicación en vivo ----
     let gps = null, firstFix = true;
     if("geolocation" in navigator){
       navigator.geolocation.watchPosition(
@@ -295,49 +223,68 @@
         { enableHighAccuracy:true, maximumAge:1000, timeout:20000 });
     } else setStatus("Este equipo no soporta geolocalización", false);
 
-    let dbReady = false, lastPush = 0, pending=false;
-    const meDoc = doc(db, "salas", room, "miembros", uid);
-    async function pushNow(){
-      if(!gps) return;
-      const now = Date.now(); if(now - lastPush < 1200){ pending=true; return; }
-      lastPush = now; pending=false;
-      try{
-        await setDoc(meDoc, { name, lat:gps.lat, lng:gps.lng, acc:gps.acc, precise:false, ts:serverTimestamp(), t:now });
-        if(!dbReady){ dbReady=true; setStatus("Conectado a la junta", true); setTimeout(()=>status.classList.add("hide"), 2500); }
-      }catch(err){ setStatus("Sala aún no activa (revisa la base de datos)", false); }
-    }
-    setInterval(()=>{ if(pending) pushNow(); }, 1300);
-    window.addEventListener("beforeunload", () => { try{ deleteDoc(meDoc); }catch(e){} });
+    let dbReady = false;
+    const { pushNow } = createPresence({
+      room, uid, getName,
+      getPos: () => gps ? { lat:gps.lat, lng:gps.lng, acc:gps.acc, precise:false } : null,
+      onOk(){ if(!dbReady){ dbReady = true; setStatus("Conectado a la junta", true); setTimeout(()=>status.classList.add("hide"), 2500); } },
+      onErr(){ setStatus("Sala aún no activa (revisa la base de datos)", false); }
+    });
 
     // ---- miembros del grupo en el mapa ----
     const markers = new Map();
+    const membersData = new Map();     // uid → último doc (para nombres y lista de permisos)
     let memberCount = 0;
-    function mkIcon(kind, label){ return L.divIcon({ className:"", html:`<div class="pin ${kind}"><span class="plabel">${esc(label)}</span></div>`, iconSize:[20,20], iconAnchor:[10,10] }); }
-    function esc(s){ return String(s||"").replace(/[<>&"]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c])); }
+    function mkIcon(kind, label, crown){
+      const tag = (crown ? "👑 " : "") + esc(label);
+      return L.divIcon({ className:"", html:`<div class="pin ${kind}"><span class="plabel">${tag}</span></div>`, iconSize:[20,20], iconAnchor:[10,10] });
+    }
 
     onSnapshot(collection(db,"salas",room,"miembros"), snap => {
       const now = Date.now(); const seen = new Set(); let count = 0;
+      membersData.clear();
       snap.forEach(d => {
         const m = d.data(); if(!m || m.lat==null) return;
-        if(m.t && now - m.t > 90000) return;
+        if(m.t && now - m.t > STALE_MS) return;
         seen.add(d.id); count++;
+        membersData.set(d.id, m);
         const isMe = d.id === uid;
+        const crown = junta && junta.ownerUid === d.id;
         const ll = [m.lat, m.lng];
         let mk = markers.get(d.id);
-        if(!mk){ mk = L.marker(ll, { icon:mkIcon(isMe?"you":"friend", isMe?"tú":(m.name||"amigo")) }).addTo(map); markers.set(d.id, mk); }
-        else { mk.setLatLng(ll); mk.setIcon(mkIcon(isMe?"you":"friend", isMe?"tú":(m.name||"amigo"))); }
+        if(!mk){ mk = L.marker(ll, { icon:mkIcon(isMe?"you":"friend", isMe?"tú":(m.name||"amigo"), crown) }).addTo(map); markers.set(d.id, mk); }
+        else { mk.setLatLng(ll); mk.setIcon(mkIcon(isMe?"you":"friend", isMe?"tú":(m.name||"amigo"), crown)); }
       });
       for(const [id,mk] of markers){ if(!seen.has(id)){ map.removeLayer(mk); markers.delete(id); } }
       memberCount = count;
       renderJuntaUI();
     }, err => setStatus("Sala aún no activa (revisa la base de datos)", false));
 
-    // ---- LA JUNTA: punto + hora compartidos ----
+    // ---- LA JUNTA: punto + hora + gobernanza ----
+    const JUNTA_TTL_MS = 30 * 24 * 3600_000;   // una junta abandonada se borra sola al mes
+    const LIBERAR_MS  = 24 * 3600_000;         // P1: sin ediciones en 24 h → se libera
     const juntaDoc = doc(db, "salas", room, "junta", "actual");
     const cambiosCol = collection(db, "salas", room, "junta", "actual", "cambios");
-    let junta = null;          // {lat,lng,when,title,by,byUid,t}
+    let junta = null;          // {lat,lng,when,title,ownerUid,policy,editors,by,byUid,t}
     let flagMk = null;
     let firstJuntaLoad = true;
+
+    // ¿Puedo editar el punto/hora según la gobernanza actual?
+    function allowedByPolicy(j){
+      if(!j || !j.ownerUid) return true;                       // sin junta o legacy: se adopta
+      if(j.ownerUid === uid) return true;
+      if(j.policy === "all") return true;
+      if(j.policy === "editors" && (j.editors||[]).includes(uid)) return true;
+      return false;
+    }
+    function isStale(j){ return j && j.t && (Date.now() - j.t) > LIBERAR_MS; }
+    function canEdit(){ return allowedByPolicy(junta) || isStale(junta); }
+    function ownerName(){
+      if(!junta || !junta.ownerUid) return "el organizador";
+      if(junta.ownerUid === uid) return "tú";
+      const m = membersData.get(junta.ownerUid);
+      return m && m.name ? m.name : "el organizador";
+    }
 
     onSnapshot(juntaDoc, snap => {
       const prev = junta;
@@ -355,38 +302,74 @@
           const retimed = prev && prev.when !== junta.when;
           let what = !prev ? "fijó el punto de junta" :
                      moved && retimed ? "cambió el lugar y la hora" :
-                     moved ? "movió el punto de junta" : "cambió la hora";
+                     moved ? "movió el punto de junta" :
+                     retimed ? "cambió la hora" : "cambió los permisos";
           showToast(`<b>${esc(junta.by||"Alguien")}</b> ${what}`,
                     (junta.when ? "🕒 " + fmtWhen(junta.when) + " · " : "") + "el mapa ya está actualizado");
-          map.flyTo(ll, Math.max(map.getZoom(), 16));
+          if(moved || !prev) map.flyTo(ll, Math.max(map.getZoom(), 16));
         }
       } else if(flagMk){ map.removeLayer(flagMk); flagMk = null; }
       firstJuntaLoad = false;
       renderJuntaUI();
     });
 
+    // historial + aviso al organizador cuando alguien quiere mover
+    let lastCambioT = 0, firstCambios = true;
     onSnapshot(query(cambiosCol, orderBy("t","desc"), limit(8)), snap => {
       const ul = document.getElementById("histList"); ul.innerHTML = "";
+      let newest = null;
       snap.forEach(d => {
-        const c = d.data(); const li = document.createElement("li");
+        const c = d.data(); if(!newest) newest = c;
+        const li = document.createElement("li");
         li.innerHTML = `<b>${esc(c.by||"Alguien")}</b> ${esc(c.what||"")} <small>· ${ago(c.t)}</small>`;
         ul.appendChild(li);
       });
+      if(newest){
+        if(!firstCambios && newest.t > lastCambioT && newest.what && newest.what.includes("quiere mover")
+           && junta && junta.ownerUid === uid){
+          showToast(`<b>${esc(newest.by||"Alguien")}</b> quiere mover la junta 🙋`,
+                    "puedes moverla tú, o darle permiso con el botón 🔑");
+        }
+        lastCambioT = Math.max(lastCambioT, newest.t || 0);
+      }
+      firstCambios = false;
     });
 
     async function saveJunta(patch, what){
       const base = junta || {};
+      const now = Date.now();
+      // ¿tomo la administración? junta nueva, legacy sin dueño, o liberada por inactividad
+      const takeover = !base.ownerUid || (base.ownerUid !== uid && !allowedByPolicy(base) && isStale(base));
+      const reclamo = takeover && base.ownerUid && base.ownerUid !== uid;
       const data = {
         lat: patch.lat ?? base.lat ?? null,
         lng: patch.lng ?? base.lng ?? null,
         when: patch.when !== undefined ? patch.when : (base.when ?? null),
         title: patch.title !== undefined ? patch.title : (base.title ?? ""),
-        by: name, byUid: uid, t: Date.now(), ts: serverTimestamp()
+        ownerUid: takeover ? uid : base.ownerUid,
+        policy: patch.policy !== undefined ? patch.policy : (takeover ? "owner" : (base.policy || "owner")),
+        editors: patch.editors !== undefined ? patch.editors : (takeover ? [] : (base.editors || [])),
+        by: getName(), byUid: uid, t: now, ts: serverTimestamp(),
+        expireAt: expireAt(JUNTA_TTL_MS)
       };
       try{
         await setDoc(juntaDoc, data);
-        await addDoc(cambiosCol, { by:name, what, t:Date.now(), ts:serverTimestamp() });
-      }catch(err){ setStatus("No se pudo guardar (revisa conexión)", false); }
+        await addDoc(cambiosCol, { by:getName(), what: what + (reclamo ? " · reclamó la junta (organizador inactivo) 👑" : ""),
+                                   t: now, ts: serverTimestamp(), expireAt: expireAt(JUNTA_TTL_MS) });
+      }catch(err){
+        setStatus(allowedByPolicy(junta) ? "No se pudo guardar (revisa conexión)" : ("Solo " + ownerName() + " puede cambiar la junta"), false);
+      }
+    }
+
+    // ---- pedir mover (cuando no tengo permiso) ----
+    let lastAsk = 0;
+    async function pedirMover(){
+      showToast(`🔒 Solo <b>${esc(ownerName())}</b> puede mover la junta`,
+                "le avisamos que quieres moverla 🙋");
+      const now = Date.now();
+      if(now - lastAsk < 60000) return;   // máx. 1 aviso por minuto
+      lastAsk = now;
+      try{ await addDoc(cambiosCol, { by:getName(), what:"quiere mover la junta 🙋", t:now, ts:serverTimestamp(), expireAt: expireAt(JUNTA_TTL_MS) }); }catch(e){}
     }
 
     // ---- colocar / mover el punto ----
@@ -403,7 +386,10 @@
         else if(gps) map.setView([gps.lat, gps.lng], Math.max(map.getZoom(), 17));
       } else status.classList.add("hide");
     }
-    document.getElementById("setPointBtn").addEventListener("click", () => setPlacing(true));
+    document.getElementById("setPointBtn").addEventListener("click", () => {
+      if(!canEdit()){ pedirMover(); return; }
+      setPlacing(true);
+    });
     document.getElementById("placeCancel").addEventListener("click", () => setPlacing(false));
     document.getElementById("placeOk").addEventListener("click", async () => {
       const c = map.getCenter();
@@ -413,6 +399,7 @@
       if(isNew && !(junta && junta.when)) openModal(); // recién creada: pedir hora al tiro
     });
     map.on("dblclick", async (e) => {
+      if(!canEdit()){ pedirMover(); return; }
       const isNew = !junta || junta.lat == null;
       await saveJunta({ lat:e.latlng.lat, lng:e.latlng.lng }, isNew ? "fijó el punto de junta 🚩" : "movió el punto de junta 📍");
     });
@@ -426,7 +413,10 @@
       titleInput.value = junta && junta.title ? junta.title : "";
       modal.classList.add("on");
     }
-    document.getElementById("setTimeBtn").addEventListener("click", openModal);
+    document.getElementById("setTimeBtn").addEventListener("click", () => {
+      if(!canEdit()){ pedirMover(); return; }
+      openModal();
+    });
     document.getElementById("modalNo").addEventListener("click", () => modal.classList.remove("on"));
     document.getElementById("modalOk").addEventListener("click", async () => {
       const v = whenInput.value ? new Date(whenInput.value).getTime() : null;
@@ -436,18 +426,67 @@
       modal.classList.remove("on");
     });
 
+    // ---- permisos (solo el organizador) ----
+    const permModal = document.getElementById("permModal"), memList = document.getElementById("memList");
+    function openPerm(){
+      const pol = (junta && junta.policy) || "owner";
+      document.querySelectorAll('input[name="pol"]').forEach(r => { r.checked = r.value === pol; });
+      renderMemList();
+      memList.classList.toggle("on", pol === "editors");
+      permModal.classList.add("on");
+    }
+    function renderMemList(){
+      memList.innerHTML = "";
+      const editors = (junta && junta.editors) || [];
+      let any = false;
+      for(const [id, m] of membersData){
+        if(id === uid) continue;
+        any = true;
+        const li = document.createElement("li");
+        const lb = document.createElement("label");
+        const cb = document.createElement("input");
+        cb.type = "checkbox"; cb.value = id; cb.checked = editors.includes(id);
+        lb.appendChild(cb); lb.appendChild(document.createTextNode(" " + (m.name || "amigo")));
+        li.appendChild(lb); memList.appendChild(li);
+      }
+      if(!any){ const li = document.createElement("li"); li.className = "none";
+        li.textContent = "Aún no hay más personas en la sala"; memList.appendChild(li); }
+    }
+    document.querySelectorAll('input[name="pol"]').forEach(r =>
+      r.addEventListener("change", () => memList.classList.toggle("on", r.value === "editors" && r.checked)));
+    document.getElementById("permBtn").addEventListener("click", openPerm);
+    document.getElementById("chipPerm").addEventListener("click", () => { if(junta && junta.ownerUid === uid) openPerm(); });
+    document.getElementById("permNo").addEventListener("click", () => permModal.classList.remove("on"));
+    document.getElementById("permOk").addEventListener("click", async () => {
+      const pol = (document.querySelector('input[name="pol"]:checked') || {}).value || "owner";
+      const editors = pol === "editors"
+        ? Array.from(memList.querySelectorAll("input:checked")).map(c => c.value)
+        : [];
+      const msg = pol === "all" ? "dejó que todos muevan la junta 🔓"
+                : pol === "editors" ? ("eligió " + editors.length + " persona(s) con permiso 🔑")
+                : "restringió la junta: solo el organizador 🔒";
+      await saveJunta({ policy: pol, editors }, msg);
+      permModal.classList.remove("on");
+    });
+
     // ---- UI de la junta ----
     const lead=document.getElementById("lead"), sub=document.getElementById("sub"),
           metric=document.getElementById("metric"), distEl=document.getElementById("dist"), distUnit=document.getElementById("distUnit"),
           timechips=document.getElementById("timechips"), chipWhen=document.getElementById("chipWhen"),
           chipCount=document.getElementById("chipCount"), chipPeople=document.getElementById("chipPeople"),
-          setPointBtn=document.getElementById("setPointBtn");
+          chipPerm=document.getElementById("chipPerm"),
+          setPointBtn=document.getElementById("setPointBtn"), setTimeBtn=document.getElementById("setTimeBtn"),
+          permBtn=document.getElementById("permBtn");
 
     function renderJuntaUI(){
+      const editable = canEdit();
+      setPointBtn.classList.toggle("off", !editable);
+      setTimeBtn.classList.toggle("off", !editable);
+      permBtn.style.display = (junta && junta.ownerUid === uid) ? "" : "none";
       if(junta && junta.lat != null){
         lead.textContent = junta.title || "Punto de junta fijado";
         sub.textContent = (junta.by ? "Último cambio: " + junta.by : "") + (junta.t ? " · " + ago(junta.t) : "");
-        setPointBtn.innerHTML = "📍 Mover la junta";
+        setPointBtn.innerHTML = editable ? "📍 Mover la junta" : "🔒 Pedir mover";
         timechips.style.display = "flex";
         if(junta.when){
           chipWhen.textContent = "🕒 " + fmtWhen(junta.when);
@@ -457,6 +496,18 @@
           chipCount.style.display = "";
         } else { chipWhen.textContent = "🕒 sin hora aún"; chipCount.style.display = "none"; }
         chipPeople.textContent = "👥 " + (memberCount <= 1 ? "solo tú" : memberCount + " en el grupo");
+        // chip de gobernanza
+        chipPerm.style.display = "";
+        chipPerm.classList.toggle("mine", junta.ownerUid === uid);
+        if(isStale(junta) && !allowedByPolicy(junta)){
+          chipPerm.textContent = "🔓 liberada (organizador inactivo)";
+        } else if(junta.policy === "all"){
+          chipPerm.textContent = "🔓 todos pueden moverla";
+        } else if(junta.policy === "editors"){
+          chipPerm.textContent = junta.ownerUid === uid ? ("🔑 tú + " + (junta.editors||[]).length + " · cambiar") : ("🔑 " + ownerName() + " + elegidos");
+        } else {
+          chipPerm.textContent = junta.ownerUid === uid ? "🔒 solo tú · toca para cambiar" : ("🔒 la mueve " + ownerName());
+        }
         if(gps){
           const d = haversine(gps.lat, gps.lng, junta.lat, junta.lng);
           metric.style.display = "block";
@@ -465,7 +516,7 @@
         } else metric.style.display = "none";
       } else {
         lead.textContent = "Aún no hay punto de junta";
-        sub.textContent = "Fija dónde se juntan y compártelo al grupo";
+        sub.textContent = "Fija dónde se juntan y compártelo al grupo · quien la fija queda como organizador 👑";
         setPointBtn.innerHTML = "🚩 Fijar la junta aquí";
         timechips.style.display = "none";
         metric.style.display = "none";
@@ -486,10 +537,7 @@
       if(navigator.vibrate) navigator.vibrate(80);
     }
 
-    // ---- helpers ----
-    function haversine(a,b,c,d){ const R=6371000,rad=x=>x*Math.PI/180;
-      const dLat=rad(c-a),dLng=rad(d-b); const s=Math.sin(dLat/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(dLng/2)**2;
-      return 2*R*Math.asin(Math.sqrt(s)); }
+    // ---- helpers de fecha ----
     function fmtWhen(t){
       if(!t) return "—";
       const d = new Date(t), now = new Date();

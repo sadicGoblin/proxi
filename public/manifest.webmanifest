@@ -1,0 +1,16 @@
+{
+  "name": "Proxi — encuéntrense exacto",
+  "short_name": "Proxi",
+  "description": "Comparte tu ubicación precisa en vivo y fija la junta del grupo. Sin instalar nada más: un link.",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0e1a",
+  "theme_color": "#0b0e1a",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
