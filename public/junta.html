@@ -51,6 +51,16 @@
     .wpt{width:22px;height:22px;border-radius:50%;background:#a78bfa;border:2px solid #fff;color:#231a40;
       font:800 11px var(--sans);display:grid;place-items:center;box-shadow:0 0 0 2px rgba(0,0,0,.3);cursor:grab}
 
+    /* lista de quiénes están (chip 👥) */
+    #chipPeople{cursor:pointer}
+    .ppl{list-style:none;margin:0 0 6px;padding:0;max-height:260px;overflow:auto}
+    .ppl li{display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid rgba(255,255,255,.05);font-size:13.5px;font-weight:600}
+    .ppl li:first-child{border-top:none}
+    .ppl .av{width:28px;height:28px;border-radius:50%;background:var(--surface2) center/cover no-repeat;
+      display:grid;place-items:center;font:800 11px var(--sans);flex:0 0 auto;border:1px solid var(--line)}
+    .ppl small{margin-left:auto;color:var(--mute);font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .ppl .none{color:var(--mute);font-weight:500}
+
     /* ¿qué mueve el doble clic? la junta o mi punto exacto */
     .dblrow{display:flex;align-items:center;gap:9px;margin-top:11px}
     .dblrow .dl{font-size:10.5px;font-weight:800;letter-spacing:.06em;color:var(--mute);flex:0 0 auto}
@@ -195,6 +205,15 @@
     </div>
   </div>
 
+  <div class="modal" id="pplModal">
+    <div class="card">
+      <h3>Quiénes están</h3>
+      <p>Distancia al punto de junta · orden alfabético.</p>
+      <ul class="ppl" id="pplList"></ul>
+      <div class="acts"><button class="ok" id="pplOk">Listo</button></div>
+    </div>
+  </div>
+
   <div class="modal" id="permModal">
     <div class="card">
       <h3>¿Quién puede mover la junta?</h3>
@@ -217,10 +236,11 @@
   <script type="module">
     import { doc, setDoc, addDoc, deleteDoc, collection, onSnapshot, query, orderBy, limit, serverTimestamp }
       from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { db, rnd, ensureAuth, setupProfile, initBasemaps, photoOf, esc, haversine, createPresence, registerSW, STALE_MS, expireAt }
+    import { db, rnd, ensureAuth, setupProfile, initBasemaps, photoOf, esc, haversine, createPresence, registerSW, keepAwake, rememberRoom, STALE_MS, GONE_MS, expireAt }
       from "./js/core.js";
 
     registerSW();
+    keepAwake();
 
     const status = document.getElementById("status");
     const statusTxt = document.getElementById("statusTxt");
@@ -235,6 +255,7 @@
     let room = url.searchParams.get("s");
     if(!room){ room = rnd(5); url.searchParams.set("s", room); history.replaceState(null,"",url); }
     document.getElementById("roomLabel").textContent = "junta · " + room;
+    rememberRoom("junta", room);
 
     // Perfil: nombre + Google opcional (foto en el mapa, rol de organizador persistente)
     const profile = setupProfile({ btn: document.getElementById("avatarBtn"),
@@ -286,13 +307,16 @@
       membersData.clear();
       snap.forEach(d => {
         const m = d.data(); if(!m || m.lat==null) return;
-        if(m.t && now - m.t > STALE_MS) return;
-        seen.add(d.id); count++;
+        const age = m.t ? now - m.t : 0;
+        if(age > GONE_MS) return;                 // más de 10 min sin señal: fuera del mapa
+        const stale = age > STALE_MS;             // típico: teléfono bloqueado → se atenúa
+        seen.add(d.id); if(!stale) count++;
         membersData.set(d.id, m);
         const isMe = d.id === uid;
         const crown = junta && junta.ownerUid === d.id;
         const ll = [m.lat, m.lng];
-        const icon = mkIcon(isMe?"you":"friend", isMe?"tú":(m.name||"amigo"), crown, photoOf(m));
+        const label = (isMe?"tú":(m.name||"amigo")) + (stale ? " · hace " + Math.max(2, Math.round(age/60000)) + " min" : "");
+        const icon = mkIcon((isMe?"you":"friend") + (stale?" stale":""), label, crown, photoOf(m));
         let mk = markers.get(d.id);
         if(!mk){ mk = L.marker(ll, { icon }).addTo(map); markers.set(d.id, mk); }
         else { mk.setLatLng(ll); mk.setIcon(icon); }
@@ -352,6 +376,7 @@
         }
       } else if(flagMk){ map.removeLayer(flagMk); flagMk = null; }
       firstJuntaLoad = false;
+      if(junta && junta.title) rememberRoom("junta", room, junta.title);   // nombre del lugar en "grupos recientes"
       renderJuntaUI();
       updateRoute(true);   // si mueven la junta, la ruta se rehace al tiro
     });
@@ -815,6 +840,47 @@
     setInterval(renderJuntaUI, 30000); // refresca el "falta X min"
 
     document.getElementById("histBtn").addEventListener("click", () => document.getElementById("hist").classList.toggle("on"));
+
+    // ---- quiénes están (chip 👥): nombres ordenados + distancia al punto ----
+    const pplModal = document.getElementById("pplModal"), pplList = document.getElementById("pplList");
+    function openPpl(){
+      pplList.innerHTML = "";
+      const now = Date.now();
+      const rows = [...membersData.entries()]
+        .sort((a, b) => {
+          if(a[0] === uid) return -1; if(b[0] === uid) return 1;   // tú primero
+          return (a[1].name || "zz").localeCompare(b[1].name || "zz", "es", { sensitivity:"base" });
+        });
+      if(!rows.length){
+        const li = document.createElement("li");
+        li.className = "none"; li.textContent = "Solo tú por ahora · comparte el link del grupo";
+        pplList.appendChild(li);
+      }
+      for(const [id, m] of rows){
+        const li = document.createElement("li");
+        const av = document.createElement("span"); av.className = "av";
+        const p = photoOf(m);
+        if(p) av.style.backgroundImage = `url('${p}')`;
+        else av.textContent = ((m.name || "?")[0] || "?").toUpperCase();
+        const nm = document.createElement("span");
+        nm.textContent = (id === uid ? "Tú" : (m.name || "amigo")) + (junta && junta.ownerUid === id ? " 👑" : "");
+        const sm = document.createElement("small");
+        const parts = [];
+        if(junta && junta.lat != null && m.lat != null){
+          const d = haversine(m.lat, m.lng, junta.lat, junta.lng);
+          parts.push(d >= 1000 ? (d/1000).toFixed(1) + " km" : Math.round(d) + " m");
+        }
+        const age = m.t ? now - m.t : 0;
+        if(age > STALE_MS) parts.push("hace " + Math.max(2, Math.round(age/60000)) + " min");
+        sm.textContent = parts.join(" · ");
+        li.append(av, nm, sm);
+        pplList.appendChild(li);
+      }
+      pplModal.classList.add("on");
+    }
+    document.getElementById("chipPeople").addEventListener("click", openPpl);
+    document.getElementById("pplOk").addEventListener("click", () => pplModal.classList.remove("on"));
+    pplModal.addEventListener("click", e => { if(e.target === pplModal) pplModal.classList.remove("on"); });
 
     // ---- toast ----
     const toast = document.getElementById("toast"), toastTx = document.getElementById("toastTx");

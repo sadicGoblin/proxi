@@ -125,6 +125,8 @@ body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--text);ove
 .pin.you.haspic{border-color:var(--you)}
 .pin.friend.haspic{border-color:var(--friend)}
 .pin.haspic .plabel{top:-27px}
+/* sin señal reciente (p. ej. teléfono bloqueado): atenuado, con "hace X min" en la etiqueta */
+.pin.stale{opacity:.5}
 .plabel{position:absolute;top:-24px;left:50%;transform:translateX(-50%);white-space:nowrap;
   font:700 11px var(--sans);color:#fff;background:rgba(10,13,26,.85);padding:2px 7px;border-radius:6px;border:1px solid var(--line)}
 .leaflet-container{background:#0b0e1a;font-family:var(--sans)}

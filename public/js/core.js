@@ -42,9 +42,11 @@ export async function ensureAuth(){
   });
 }
 
-// El cliente ignora posiciones más viejas que esto; además los docs llevan
-// `expireAt` para que la política TTL de Firestore los borre sola (ver README).
+// Frescura de posiciones: hasta STALE_MS se muestran normal; entre STALE_MS y
+// GONE_MS se muestran atenuadas con "hace X min" (típico: teléfono bloqueado);
+// después desaparecen. Los docs llevan `expireAt` para el TTL de Firestore.
 export const STALE_MS = 90_000;
+export const GONE_MS = 10 * 60_000;
 const PRESENCE_TTL_MS = 60 * 60_000;   // 1 h: una posición huérfana no vive más que eso
 
 export const rnd = n => Array.from({length:n}, () => "abcdefghjkmnpqrstuvwxyz23456789"[Math.floor(Math.random()*30)]).join("");
@@ -222,6 +224,34 @@ export function createPresence({ room, uid, getPos, getName, getPhoto, onOk, onE
   addEventListener("pageshow", () => { lastPush = 0; pushNow(); });
   document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible"){ lastPush = 0; pushNow(); } });
   return { pushNow };
+}
+
+// ── Grupos recientes ─────────────────────────────────────────────────────────
+// Guarda las salas/juntas visitadas para volver a ellas desde la portada
+// sin tener que buscar el link en WhatsApp.
+const ROOMS_KEY = "proxi_rooms";
+export function rememberRoom(type, room, label){
+  try{
+    let list = JSON.parse(localStorage.getItem(ROOMS_KEY) || "[]");
+    const prev = list.find(r => r.t === type && r.s === room);
+    list = list.filter(r => !(r.t === type && r.s === room));
+    list.unshift({ t: type, s: room, label: String(label || (prev && prev.label) || "").slice(0, 40), at: Date.now() });
+    localStorage.setItem(ROOMS_KEY, JSON.stringify(list.slice(0, 8)));
+  }catch(e){}
+}
+export function recentRooms(){
+  try{ return JSON.parse(localStorage.getItem(ROOMS_KEY) || "[]").filter(r => r && r.s); }
+  catch(e){ return []; }
+}
+
+// Mantiene la pantalla encendida mientras Proxi está visible: si la pantalla se
+// bloquea, el navegador congela la página y la posición deja de actualizarse.
+// (Si el usuario bloquea a mano igual se congela; eso solo lo resuelve una app nativa.)
+export function keepAwake(){
+  if(!("wakeLock" in navigator)) return;
+  const req = () => navigator.wakeLock.request("screen").catch(()=>{});
+  req();
+  document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") req(); });
 }
 
 export function registerSW(){
