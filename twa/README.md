@@ -31,7 +31,7 @@ Para publicar una nueva versión del APK: sube `versionCode`/`versionName` en
   actualizar ese archivo y volver a desplegar la web.
 
 SHA-256 actual:
-`E1:DC:60:9D:74:AC:E5:15:B0:0E:C6:B0:D5:E9:9C:13:24:61:1E:21:A3:AE:F2:69:29:38:8A:23:FB:01:C9:E4`
+`B9:61:90:DB:3C:79:7A:78:84:FA:DC:C8:DB:22:41:25:25:80:BA:9C:73:A1:C1:E5:CC:22:96:FD:BA:F5:52:2C`
 
 ## Detalles
 
