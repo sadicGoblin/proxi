@@ -1,6 +1,6 @@
 // Proxi — service worker: deja el "app shell" disponible offline y acelera cargas.
 // Sube la versión al cambiar cualquier archivo del shell.
-const CACHE = "proxi-v10";
+const CACHE = "proxi-v11";
 const SHELL = [
   "/", "/index.html", "/junta.html", "/descargar.html",
   "/css/proxi.css", "/js/core.js",
@@ -42,8 +42,8 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // Archivos grandes (APK antiguo): directo a red, sin caché.
-  if(u.pathname.endsWith(".bin")) return;
+  // Archivos grandes (APK): directo a red, sin caché.
+  if(u.pathname.endsWith(".bin") || u.pathname.endsWith(".apk")) return;
 
   // Assets propios: RED primero, caché solo como respaldo offline.
   // (Caché-primero mezclaba HTML nuevo con JS/CSS viejos → página rota hasta el segundo F5.)

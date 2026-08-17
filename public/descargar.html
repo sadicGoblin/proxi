@@ -26,6 +26,11 @@
       box-shadow:0 14px 30px -10px rgba(255,77,109,.8)}
     .cta.on{display:inline-flex}
     .cta:active{transform:translateY(1px)}
+    .cta2{display:inline-flex;align-items:center;gap:10px;text-decoration:none;
+      background:var(--surface);border:1px solid var(--line);color:var(--text);
+      font-size:15.5px;font-weight:800;padding:14px 26px;border-radius:14px}
+    .cta2:active{transform:translateY(1px)}
+    .meta{color:var(--mute);font-size:12px;margin:-12px 0 0}
     .ready{display:none;color:#5fd08a;font-weight:700;font-size:14.5px}
     .ready.on{display:block}
     .card{background:var(--surface);border:1px solid var(--line);border-radius:18px;
@@ -53,6 +58,9 @@
   <button class="cta" id="installBtn">📲 Instalar ahora</button>
   <p class="ready" id="doneMsg">✓ Instalada — búscala en tu pantalla de inicio</p>
 
+  <a class="cta2" href="proxi.bin" download="Proxi.apk">🤖 Descargar APK (Android)</a>
+  <p class="meta">APK oficial · 3,6 MB · misma Proxi a pantalla completa, se actualiza sola</p>
+
   <div class="card" id="androidCard">
     <h2>Android (Chrome)</h2>
     <ol>
@@ -75,7 +83,7 @@
       <div>🚀 Abre al toque desde tu pantalla de inicio, a pantalla completa.</div>
       <div>📴 El mapa y la app cargan incluso con mala señal (se guarda en tu teléfono).</div>
       <div>🔗 Los links de salas y juntas se abren igual; nada cambia para tu grupo.</div>
-      <div>📦 La app nativa (APK con ubicación en segundo plano) viene en camino — esta versión se actualiza sola mientras tanto.</div>
+      <div>🤖 ¿Prefieres el APK? Descárgalo arriba: es la misma Proxi como app Android de verdad. Al abrirlo, permite "instalar de fuentes desconocidas".</div>
     </div>
   </div>
 
