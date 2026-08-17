@@ -1,0 +1,10 @@
+# credenciales de firma: NUNCA a git (respáldalas aparte — sin el keystore no
+# se puede actualizar la app instalada)
+keystore.properties
+*.keystore
+
+# entorno local y artefactos de build
+local.properties
+.gradle/
+build/
+app/build/
