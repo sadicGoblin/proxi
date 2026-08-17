@@ -22,3 +22,6 @@ proxi_app/android/key.properties
 proxi_app/ios/Pods/
 proxi_app/ios/.symlinks/
 proxi_app/ios/Flutter/ephemeral/
+
+# twa/ (rama apk): en main se ignora completo; llaves de firma JAMAS a git
+twa/
