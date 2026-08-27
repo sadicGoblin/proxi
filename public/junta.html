@@ -7,8 +7,7 @@
   <title>Proxi — Junta del grupo</title>
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="css/proxi.css" />
   <style>
     /* aviso de cambio (toast) */
@@ -231,12 +230,11 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script type="module">
     import { doc, setDoc, addDoc, deleteDoc, collection, onSnapshot, query, orderBy, limit, serverTimestamp }
       from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { db, rnd, ensureAuth, setupProfile, initBasemaps, photoOf, esc, haversine, createPresence, registerSW, keepAwake, rememberRoom, STALE_MS, GONE_MS, expireAt }
+    import { db, rnd, ensureAuth, setupProfile, createMap, setLine, removeLine, photoOf, esc, haversine, createPresence, registerSW, keepAwake, watchLocation, rememberRoom, STALE_MS, GONE_MS, expireAt }
       from "./js/core.js";
 
     registerSW();
@@ -262,25 +260,23 @@
                                    onChange: () => { pushNow(); renderJuntaUI(); } });
     const getName = profile.getName;
 
-    // ---- mapa ----
-    const map = L.map("map", { zoomControl:true, attributionControl:true, tap:true }).setView([-33.4489,-70.6693], 3);
-    initBasemaps(map);
-    map.doubleClickZoom.disable();
+    // ---- mapa (MapLibre: gira con 2 dedos, brújula arriba a la derecha) ----
+    const map = createMap("map");
 
     // ---- mi ubicación en vivo (GPS, o punto exacto fijado a mano) ----
     let gps = null, firstFix = true;
     let manual = null, usingManual = false;   // doble clic en modo "mi punto" fija esto (±1,5 m)
     function myPos(){ return usingManual && manual ? { lat:manual.lat, lng:manual.lng, acc:1.5, precise:true }
                                                    : (gps ? { lat:gps.lat, lng:gps.lng, acc:gps.acc, precise:false } : null); }
-    if("geolocation" in navigator){
-      navigator.geolocation.watchPosition(
-        p => { gps = { lat:p.coords.latitude, lng:p.coords.longitude, acc:p.coords.accuracy };
-               if(firstFix){ firstFix=false; if(!junta) map.setView([gps.lat,gps.lng], 17); }
-               setStatus(dbReady ? "Conectado a la junta" : "Ubicación lista · conectando…", dbReady);
-               pushNow(); renderJuntaUI(); },
-        e => setStatus("Activa el permiso de ubicación para que te vean llegar", false),
-        { enableHighAccuracy:true, maximumAge:1000, timeout:20000 });
-    } else setStatus("Este equipo no soporta geolocalización", false);
+    const geo = watchLocation(
+      p => { gps = { lat:p.coords.latitude, lng:p.coords.longitude, acc:p.coords.accuracy };
+             if(firstFix){ firstFix=false; if(!junta) map.jumpTo({ center:[gps.lng, gps.lat], zoom:17 }); }
+             setStatus(dbReady ? "Conectado a la junta" : "Ubicación lista · conectando…", dbReady);
+             pushNow(); renderJuntaUI(); },
+      why => setStatus(why === "denied" ? "Ubicación bloqueada · permítela en el candado 🔒 de la barra y toca aquí"
+                     : why === "unsupported" ? "Este equipo no soporta geolocalización"
+                     : "Sin señal de GPS · toca aquí para reintentar", false));
+    status.addEventListener("click", () => geo.restart());   // reintento sin recargar la pestaña
 
     let dbReady = false;
     const { pushNow } = createPresence({
@@ -291,15 +287,26 @@
     });
 
     // ---- miembros del grupo en el mapa ----
-    const markers = new Map();
+    const markers = new Map();         // uid → { mk, el, html }
     const membersData = new Map();     // uid → último doc (para nombres y lista de permisos)
     let memberCount = 0;
-    function mkIcon(kind, label, crown, photo){
+    function pinHtml(kind, label, crown, photo){
       const tag = (crown ? "👑 " : "") + esc(label);
       const cls = `pin ${kind}` + (photo ? " haspic" : "");
       const st = photo ? ` style="background-image:url('${photo}')"` : "";   // photo ya viene saneada (photoOf)
-      const size = photo ? 34 : 20, half = size/2;
-      return L.divIcon({ className:"", html:`<div class="${cls}"${st}><span class="plabel">${tag}</span></div>`, iconSize:[size,size], iconAnchor:[half,half] });
+      return `<div class="${cls}"${st}><span class="plabel">${tag}</span></div>`;
+    }
+    function upsertMarker(id, lat, lng, html){
+      let m = markers.get(id);
+      if(!m){
+        const el = document.createElement("div");
+        el.innerHTML = html;
+        const mk = new maplibregl.Marker({ element: el, anchor:"center" }).setLngLat([lng, lat]).addTo(map);
+        m = { mk, el, html }; markers.set(id, m);
+      } else {
+        m.mk.setLngLat([lng, lat]);
+        if(m.html !== html){ m.el.innerHTML = html; m.html = html; }
+      }
     }
 
     onSnapshot(collection(db,"salas",room,"miembros"), snap => {
@@ -314,14 +321,10 @@
         membersData.set(d.id, m);
         const isMe = d.id === uid;
         const crown = junta && junta.ownerUid === d.id;
-        const ll = [m.lat, m.lng];
         const label = (isMe?"tú":(m.name||"amigo")) + (stale ? " · hace " + Math.max(2, Math.round(age/60000)) + " min" : "");
-        const icon = mkIcon((isMe?"you":"friend") + (stale?" stale":""), label, crown, photoOf(m));
-        let mk = markers.get(d.id);
-        if(!mk){ mk = L.marker(ll, { icon }).addTo(map); markers.set(d.id, mk); }
-        else { mk.setLatLng(ll); mk.setIcon(icon); }
+        upsertMarker(d.id, m.lat, m.lng, pinHtml((isMe?"you":"friend") + (stale?" stale":""), label, crown, photoOf(m)));
       });
-      for(const [id,mk] of markers){ if(!seen.has(id)){ map.removeLayer(mk); markers.delete(id); } }
+      for(const [id, mm] of markers){ if(!seen.has(id)){ mm.mk.remove(); markers.delete(id); } }
       memberCount = count;
       renderJuntaUI();
     }, err => setStatus("Sala aún no activa (revisa la base de datos)", false));
@@ -332,8 +335,20 @@
     const juntaDoc = doc(db, "salas", room, "junta", "actual");
     const cambiosCol = collection(db, "salas", room, "junta", "actual", "cambios");
     let junta = null;          // {lat,lng,when,title,ownerUid,policy,editors,by,byUid,t}
-    let flagMk = null;
+    let flagMk = null, flagEl = null, flagHtml = "";
     let firstJuntaLoad = true;
+    function setFlag(lat, lng, label){
+      const html = `<div class="flagpin"><span class="plabel">${label}</span>🚩</div>`;
+      if(!flagMk){
+        flagEl = document.createElement("div");
+        flagEl.innerHTML = html; flagHtml = html;
+        flagMk = new maplibregl.Marker({ element: flagEl, anchor:"bottom-left", offset:[-4, 2] })
+          .setLngLat([lng, lat]).addTo(map);
+      } else {
+        flagMk.setLngLat([lng, lat]);
+        if(flagHtml !== html){ flagEl.innerHTML = html; flagHtml = html; }
+      }
+    }
 
     // ¿Puedo editar el punto/hora según la gobernanza actual?
     function allowedByPolicy(j){
@@ -356,12 +371,8 @@
       const prev = junta;
       junta = snap.exists() ? snap.data() : null;
       if(junta && junta.lat != null){
-        const ll = [junta.lat, junta.lng];
-        const label = junta.title ? esc(junta.title) : "punto de junta";
-        const icon = L.divIcon({ className:"", html:`<div class="flagpin"><span class="plabel">${label}</span>🚩</div>`, iconSize:[30,30], iconAnchor:[4,28] });
-        if(!flagMk){ flagMk = L.marker(ll, { icon, zIndexOffset:500 }).addTo(map); }
-        else { flagMk.setLatLng(ll); flagMk.setIcon(icon); }
-        if(firstJuntaLoad){ map.setView(ll, 17); }
+        setFlag(junta.lat, junta.lng, junta.title ? esc(junta.title) : "punto de junta");
+        if(firstJuntaLoad){ map.jumpTo({ center:[junta.lng, junta.lat], zoom:17 }); }
         // aviso si lo cambió otra persona
         if(!firstJuntaLoad && junta.byUid !== uid && (!prev || prev.t !== junta.t)){
           const moved = prev && (prev.lat !== junta.lat || prev.lng !== junta.lng);
@@ -372,9 +383,9 @@
                      retimed ? "cambió la hora" : "cambió los permisos";
           showToast(`<b>${esc(junta.by||"Alguien")}</b> ${what}`,
                     (junta.when ? "🕒 " + fmtWhen(junta.when) + " · " : "") + "el mapa ya está actualizado");
-          if(moved || !prev) map.flyTo(ll, Math.max(map.getZoom(), 16));
+          if(moved || !prev) map.flyTo({ center:[junta.lng, junta.lat], zoom:Math.max(map.getZoom(), 16) });
         }
-      } else if(flagMk){ map.removeLayer(flagMk); flagMk = null; }
+      } else if(flagMk){ flagMk.remove(); flagMk = null; flagHtml = ""; }
       firstJuntaLoad = false;
       if(junta && junta.title) rememberRoom("junta", room, junta.title);   // nombre del lugar en "grupos recientes"
       renderJuntaUI();
@@ -450,8 +461,8 @@
       sheet.classList.toggle("away", v);
       if(v){
         setStatus("Mueve el mapa hasta el punto exacto de la junta", true);
-        if(junta && junta.lat != null) map.setView([junta.lat, junta.lng], Math.max(map.getZoom(), 17));
-        else { const p = myPos(); if(p) map.setView([p.lat, p.lng], Math.max(map.getZoom(), 17)); }
+        if(junta && junta.lat != null) map.easeTo({ center:[junta.lng, junta.lat], zoom:Math.max(map.getZoom(), 17) });
+        else { const p = myPos(); if(p) map.easeTo({ center:[p.lng, p.lat], zoom:Math.max(map.getZoom(), 17) }); }
       } else status.classList.add("hide");
     }
     document.getElementById("setPointBtn").addEventListener("click", () => {
@@ -468,10 +479,10 @@
     });
     map.on("dblclick", async (e) => {
       if(drawing) return;   // en modo dibujo, los clics son puntos de la ruta
-      if(dblTarget === "me"){ fixManual(e.latlng.lat, e.latlng.lng); return; }
+      if(dblTarget === "me"){ fixManual(e.lngLat.lat, e.lngLat.lng); return; }
       if(!canEdit()){ pedirMover(); return; }
       const isNew = !junta || junta.lat == null;
-      await saveJunta({ lat:e.latlng.lat, lng:e.latlng.lng }, isNew ? "fijó el punto de junta 🚩" : "movió el punto de junta 📍");
+      await saveJunta({ lat:e.lngLat.lat, lng:e.lngLat.lng }, isNew ? "fijó el punto de junta 🚩" : "movió el punto de junta 📍");
     });
 
     // ---- ¿qué mueve el doble clic? la junta (por defecto) o mi punto exacto ----
@@ -507,16 +518,15 @@
     // ---- ruta a pie hasta la junta (OSRM sobre OpenStreetMap, sin API key) ----
     // Se recalcula sola si te mueves >25 m o si mueven la junta; máx. 1 consulta cada 10 s.
     const routeBtn = document.getElementById("routeBtn"), chipRoute = document.getElementById("chipRoute");
-    let routeOn = false, routeLine = null, routeBusy = false, routeAt = 0, routeFrom = null, routeTo = null;
+    let routeOn = false, routeLine = false, routeBusy = false, routeAt = 0, routeFrom = null, routeTo = null;
     const fmtDist = m => m >= 1000 ? (m/1000).toFixed(1) + " km" : Math.round(m) + " m";
 
     function drawRoute(latlngs, straight){
-      if(routeLine) map.removeLayer(routeLine);
-      routeLine = L.polyline(latlngs, { color:"#45c6f0", weight:4, opacity:.85,
-        dashArray: straight ? "2 9" : "1 10", lineCap:"round" }).addTo(map);
+      setLine(map, "ruta-junta", latlngs, { color:"#45c6f0", width:4, opacity:.85, dash: straight ? [1.2, 2] : [0.1, 2] });
+      routeLine = true;
     }
     function clearRoute(){
-      if(routeLine){ map.removeLayer(routeLine); routeLine = null; }
+      removeLine(map, "ruta-junta"); routeLine = false;
       routeFrom = routeTo = null;
       chipRoute.style.display = "none";
     }
@@ -577,18 +587,17 @@
     }
 
     const rutachips = document.getElementById("rutachips"), chipRuta = document.getElementById("chipRuta");
-    let rutaShared = null, rutaLine = null, rutaKey = "";
+    let rutaShared = null, rutaLine = false, rutaKey = "";
     onSnapshot(rutaRef, snap => { rutaShared = snap.exists() ? snap.data() : null; renderRuta(); });
 
     function drawSharedLine(latlngs, straight){
-      if(rutaLine) map.removeLayer(rutaLine);
-      rutaLine = L.polyline(latlngs, { color:RUTA_COLOR, weight:5, opacity:.9,
-        dashArray: straight ? "2 9" : null, lineCap:"round" }).addTo(map);
+      setLine(map, "ruta-grupo", latlngs, { color:RUTA_COLOR, width:5, opacity:.9, dash: straight ? [1.2, 2] : null });
+      rutaLine = true;
     }
     async function renderRuta(){
       const pts = rutaShared ? validPts(rutaShared.pts) : [];
       if(pts.length < 2){
-        if(rutaLine){ map.removeLayer(rutaLine); rutaLine = null; }
+        if(rutaLine){ removeLine(map, "ruta-grupo"); rutaLine = false; }
         rutachips.style.display = "none"; rutaKey = ""; return;
       }
       rutachips.style.display = "flex";
@@ -612,7 +621,7 @@
     // -- modo dibujo --
     const drawbar = document.getElementById("drawbar"), drawSave = document.getElementById("drawSave"),
           drawUndo = document.getElementById("drawUndo"), drawCancel = document.getElementById("drawCancel");
-    let drawing = false, drawPts = [], drawMarkers = [], drawLine = null, lastAddT = 0, previewTimer = null, previewSeq = 0;
+    let drawing = false, drawPts = [], drawMarkers = [], drawLine = false, lastAddT = 0, previewTimer = null, previewSeq = 0;
     let drawProfile = PROFILES[localStorage.getItem("proxi_ruta_prof")] ? localStorage.getItem("proxi_ruta_prof") : "bike";
 
     function paintProf(){
@@ -625,15 +634,18 @@
 
     // Puntos numerados: se arrastran para ajustar y se tocan para eliminar.
     function redrawDrawMarkers(){
-      for(const m of drawMarkers) map.removeLayer(m);
+      for(const m of drawMarkers) m.remove();
       drawMarkers = drawPts.map((p, i) => {
-        const mk = L.marker([p.lat, p.lng], { draggable:true, zIndexOffset:600,
-          icon: L.divIcon({ className:"", html:`<div class="wpt">${i+1}</div>`, iconSize:[22,22], iconAnchor:[11,11] }) }).addTo(map);
+        const el = document.createElement("div");
+        el.innerHTML = `<div class="wpt">${i+1}</div>`;
+        const mk = new maplibregl.Marker({ element: el, anchor:"center", draggable:true })
+          .setLngLat([p.lng, p.lat]).addTo(map);
         mk.on("dragend", () => {
-          const ll = mk.getLatLng(); drawPts[i] = { lat:ll.lat, lng:ll.lng };
+          const ll = mk.getLngLat(); drawPts[i] = { lat:ll.lat, lng:ll.lng };
           schedulePreview(200); updateDrawUI();
         });
-        mk.on("click", () => {
+        el.addEventListener("click", ev => {
+          ev.stopPropagation();
           drawPts.splice(i, 1);
           redrawDrawMarkers(); schedulePreview(200); updateDrawUI();
         });
@@ -650,8 +662,8 @@
         schedulePreview(0); updateDrawUI();
       } else {
         clearTimeout(previewTimer); previewSeq++;
-        for(const m of drawMarkers) map.removeLayer(m); drawMarkers = [];
-        if(drawLine){ map.removeLayer(drawLine); drawLine = null; }
+        for(const m of drawMarkers) m.remove(); drawMarkers = [];
+        if(drawLine){ removeLine(map, "ruta-draw"); drawLine = false; }
         status.classList.add("hide");
       }
     }
@@ -664,16 +676,15 @@
       clearTimeout(previewTimer);
       previewTimer = setTimeout(async () => {
         if(!drawing) return;
-        if(drawPts.length < 2){ if(drawLine){ map.removeLayer(drawLine); drawLine = null; } return; }
+        if(drawPts.length < 2){ if(drawLine){ removeLine(map, "ruta-draw"); drawLine = false; } return; }
         const seq = ++previewSeq;
-        if(drawLine) map.removeLayer(drawLine);
-        drawLine = L.polyline(drawPts.map(p => [p.lat, p.lng]),
-          { color:RUTA_COLOR, weight:4, opacity:.5, dashArray:"2 9" }).addTo(map);
+        setLine(map, "ruta-draw", drawPts.map(p => [p.lat, p.lng]),
+          { color:RUTA_COLOR, width:4, opacity:.5, dash:[1.2, 2] });
+        drawLine = true;
         try{
           const r = await osrmRoute(drawPts, drawProfile);
           if(seq !== previewSeq || !drawing) return;
-          if(drawLine) map.removeLayer(drawLine);
-          drawLine = L.polyline(r.latlngs, { color:RUTA_COLOR, weight:5, opacity:.85, lineCap:"round" }).addTo(map);
+          setLine(map, "ruta-draw", r.latlngs, { color:RUTA_COLOR, width:5, opacity:.85 });
           setStatus(`${PROFILES[drawProfile].ic} ${fmtDist(r.dist)} · ${Math.max(1, Math.round(r.dur/60))} min · ${drawPts.length} puntos`, true);
         }catch(e){ /* la línea recta de arriba queda como vista previa */ }
       }, ms);
@@ -683,7 +694,7 @@
       const now = Date.now(); if(now - lastAddT < 350) return;   // ignora el doble disparo del dblclick
       lastAddT = now;
       if(drawPts.length >= 30){ setStatus("Máximo 30 puntos por ruta", false); return; }
-      drawPts.push({ lat:e.latlng.lat, lng:e.latlng.lng });
+      drawPts.push({ lat:e.lngLat.lat, lng:e.lngLat.lng });
       redrawDrawMarkers();
       schedulePreview(); updateDrawUI();
     });

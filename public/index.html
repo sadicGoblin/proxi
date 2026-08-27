@@ -7,8 +7,7 @@
   <title>Proxi — ubicación precisa en vivo</title>
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="css/proxi.css" />
   <style>
     /* follow toggle (floating) */
@@ -190,11 +189,10 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script type="module">
     import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { db, rnd, ensureAuth, setupProfile, initBasemaps, photoOf, esc, haversine, createPresence, registerSW, keepAwake, rememberRoom, recentRooms, STALE_MS, GONE_MS } from "./js/core.js";
+    import { db, rnd, ensureAuth, setupProfile, createMap, setCircle, photoOf, esc, haversine, createPresence, registerSW, keepAwake, watchLocation, rememberRoom, recentRooms, STALE_MS, GONE_MS } from "./js/core.js";
 
     registerSW();
 
@@ -234,9 +232,8 @@
       const profile = setupProfile({ btn: document.getElementById("avatarBtn"), onChange: () => pushNow() });
       const getName = profile.getName;
 
-      // ---- map ----
-      const map = L.map("map", { zoomControl:true, attributionControl:true, tap:true }).setView([-33.4489,-70.6693], 3);
-      initBasemaps(map);
+      // ---- map (MapLibre: gira con 2 dedos, brújula arriba a la derecha) ----
+      const map = createMap("map");
 
       // ---- follow mode (libre por defecto: solo te centra al entrar) ----
       let follow = false;
@@ -245,9 +242,9 @@
         followBtn.innerHTML = '<span class="ic"></span>Seguir: ' + (v ? "auto" : "manual");
         if(v) fitAll(); }
       followBtn.addEventListener("click", () => setFollow(!follow));
-      map.on("dragstart zoomstart", () => { if(userInteracting) setFollow(false); });
       let userInteracting = false;
-      map.on("mousedown touchstart wheel", () => { userInteracting = true; });
+      for(const ev of ["dragstart","zoomstart","rotatestart"]) map.on(ev, () => { if(userInteracting) setFollow(false); });
+      for(const ev of ["mousedown","touchstart","wheel"]) map.on(ev, () => { userInteracting = true; });
       map.on("moveend", () => { userInteracting = false; });
 
       // ---- my position (GPS or manual pin) ----
@@ -267,7 +264,7 @@
         if(v){
           if(follow) setFollow(false);   // colocar el pin requiere mover el mapa a mano
           const base = (usingManual && manual) || gps;
-          if(base) map.setView([base.lat, base.lng], Math.max(map.getZoom(), 18));
+          if(base) map.easeTo({ center:[base.lng, base.lat], zoom:Math.max(map.getZoom(), 18) });
           setStatus("Mueve el mapa hasta tu posición exacta y confirma", true);
         } else status.classList.add("hide");
       }
@@ -286,8 +283,7 @@
         setStatus("Punto exacto fijado ✓ (±1,5 m)", true);
         setTimeout(()=>status.classList.add("hide"), 2500);
       });
-      map.on("dblclick", (e) => { fixManual(e.latlng.lat, e.latlng.lng); }); // atajo para quien lo conoce
-      map.doubleClickZoom.disable();
+      map.on("dblclick", (e) => { fixManual(e.lngLat.lat, e.lngLat.lng); }); // atajo para quien lo conoce
       gpsBtn.addEventListener("click", () => { usingManual = false; manual = null; setPlacing(false);
         gpsBtn.classList.add("on"); preciseBtn.classList.remove("on");
         preciseBtn.innerHTML = '<span class="dotc"></span>Fijar mi punto exacto'; pushNow(); });
@@ -300,15 +296,15 @@
       const statusTxt = document.getElementById("statusTxt");
       function setStatus(t, ok=true){ statusTxt.textContent = t; status.classList.toggle("warn", !ok); status.classList.remove("hide"); }
       let firstFix = true;
-      if("geolocation" in navigator){
-        navigator.geolocation.watchPosition(
-          p => { gps = { lat:p.coords.latitude, lng:p.coords.longitude, acc:p.coords.accuracy };
-                 if(firstFix){ firstFix=false; map.setView([gps.lat,gps.lng], 18); }
-                 setStatus(dbReady ? "Compartiendo en vivo" : "Ubicación lista · activando sala…", dbReady);
-                 pushNow(); },
-          e => setStatus("Activa el permiso de ubicación para compartir", false),
-          { enableHighAccuracy:true, maximumAge:1000, timeout:20000 });
-      } else setStatus("Este equipo no soporta geolocalización", false);
+      const geo = watchLocation(
+        p => { gps = { lat:p.coords.latitude, lng:p.coords.longitude, acc:p.coords.accuracy };
+               if(firstFix){ firstFix=false; map.jumpTo({ center:[gps.lng, gps.lat], zoom:18 }); }
+               setStatus(dbReady ? "Compartiendo en vivo" : "Ubicación lista · activando sala…", dbReady);
+               pushNow(); },
+        why => setStatus(why === "denied" ? "Ubicación bloqueada · permítela en el candado 🔒 de la barra y toca aquí"
+                       : why === "unsupported" ? "Este equipo no soporta geolocalización"
+                       : "Sin señal de GPS · toca aquí para reintentar", false));
+      status.addEventListener("click", () => geo.restart());   // reintento sin recargar la pestaña
 
       // ---- presencia (Firestore, con expiración y limpieza al salir) ----
       let dbReady = false;
@@ -319,14 +315,24 @@
       });
 
       // ---- render members ----
-      const markers = new Map();
-      function mkIcon(kind, label, photo){
+      const markers = new Map();   // uid → { mk, el, html }
+      function pinHtml(kind, label, photo){
         const cls = `pin ${kind}` + (photo ? " haspic" : "");
         const st = photo ? ` style="background-image:url('${photo}')"` : "";   // photo ya viene saneada (photoOf)
-        const size = photo ? 34 : 20, half = size/2;
-        return L.divIcon({ className:"", html:`<div class="${cls}"${st}><span class="plabel">${esc(label)}</span></div>`, iconSize:[size,size], iconAnchor:[half,half] });
+        return `<div class="${cls}"${st}><span class="plabel">${esc(label)}</span></div>`;
       }
-      let accCircle = null;
+      function upsertMarker(id, lat, lng, html){
+        let m = markers.get(id);
+        if(!m){
+          const el = document.createElement("div");
+          el.innerHTML = html;
+          const mk = new maplibregl.Marker({ element: el, anchor:"center" }).setLngLat([lng, lat]).addTo(map);
+          m = { mk, el, html }; markers.set(id, m);
+        } else {
+          m.mk.setLngLat([lng, lat]);
+          if(m.html !== html){ m.el.innerHTML = html; m.html = html; }
+        }
+      }
 
       onSnapshot(collection(db,"salas",room,"miembros"), snap => {
         const now = Date.now(); const seen = new Set(); const pts = [];
@@ -341,17 +347,11 @@
           const ll = [m.lat, m.lng];
           if(!stale) pts.push(ll);
           const label = (isMe?"tú":(m.name||"amigo")) + (stale ? " · hace " + Math.max(2, Math.round(age/60000)) + " min" : "");
-          const icon = mkIcon((isMe?"you":"friend") + (stale?" stale":""), label, photoOf(m));
-          let mk = markers.get(d.id);
-          if(!mk){ mk = L.marker(ll, { icon }).addTo(map); markers.set(d.id, mk); }
-          else { mk.setLatLng(ll); mk.setIcon(icon); }
-          if(isMe){ me = m;
-            if(accCircle) map.removeLayer(accCircle);
-            accCircle = L.circle(ll, { radius:Math.max(m.acc||10,1.5), color:"#ff4d6d", weight:1, fillColor:"#ff4d6d", fillOpacity:.08 }).addTo(map);
-          }
+          upsertMarker(d.id, m.lat, m.lng, pinHtml((isMe?"you":"friend") + (stale?" stale":""), label, photoOf(m)));
+          if(isMe){ me = m; setCircle(map, "acc", m.lat, m.lng, Math.max(m.acc||10, 1.5)); }
         });
         // remove gone
-        for(const [id,mk] of markers){ if(!seen.has(id)){ map.removeLayer(mk); markers.delete(id); } }
+        for(const [id, mm] of markers){ if(!seen.has(id)){ mm.mk.remove(); markers.delete(id); } }
         // distance to nearest other
         if(me){ snap.forEach(d => { if(d.id===uid) return; const m=d.data(); if(!m||m.lat==null) return; if(m.t && now-m.t>STALE_MS) return;
           const dd = haversine(me.lat,me.lng,m.lat,m.lng); if(dd<nd){ nd=dd; nearest=m; } }); }
@@ -361,10 +361,12 @@
       }, err => setStatus("Sala aún no activa (falta habilitar la base de datos)", false));
 
       function fitAll(pts){
-        pts = pts || Array.from(markers.values()).map(m => { const l=m.getLatLng(); return [l.lat,l.lng]; });
+        pts = pts || Array.from(markers.values()).map(m => { const l = m.mk.getLngLat(); return [l.lat, l.lng]; });
         if(!pts.length) return;
-        if(pts.length===1){ map.setView(pts[0], Math.max(map.getZoom(),18)); return; }
-        map.fitBounds(L.latLngBounds(pts).pad(0.45), { maxZoom:21, animate:true });
+        if(pts.length === 1){ map.easeTo({ center:[pts[0][1], pts[0][0]], zoom:Math.max(map.getZoom(), 18) }); return; }
+        const b = new maplibregl.LngLatBounds();
+        for(const p of pts) b.extend([p[1], p[0]]);
+        map.fitBounds(b, { padding:90, maxZoom:20, duration:600 });
       }
 
       const lead=document.getElementById("lead"), sub=document.getElementById("sub"),

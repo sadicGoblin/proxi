@@ -1,12 +1,12 @@
 // Proxi — service worker: deja el "app shell" disponible offline y acelera cargas.
 // Sube la versión al cambiar cualquier archivo del shell.
-const CACHE = "proxi-v11";
+const CACHE = "proxi-v12";
 const SHELL = [
   "/", "/index.html", "/junta.html", "/descargar.html",
   "/css/proxi.css", "/js/core.js",
   "/manifest.webmanifest", "/icons/icon.svg", "/icons/maskable.svg",
-  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
-  "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css",
+  "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"
 ];
 
 self.addEventListener("install", e => {
@@ -57,7 +57,7 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // CDN de Leaflet (URLs con versión fija): caché primero; teselas de mapa pasan directo a red.
+  // CDN de MapLibre (URLs con versión fija): caché primero; teselas de mapa pasan directo a red.
   e.respondWith(
     caches.match(req).then(hit => hit || fetch(req).then(r => {
       if(r.ok && u.hostname === "unpkg.com"){

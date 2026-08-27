@@ -66,25 +66,138 @@ export function haversine(a,b,c,d){ const R=6371000,rad=x=>x*Math.PI/180;
 // Timestamp de expiración para la política TTL de Firestore.
 export const expireAt = ms => Timestamp.fromMillis(Date.now() + ms);
 
-// ── Mapas base compartidos ────────────────────────────────────────────────────
-// El estilo elegido se recuerda entre visitas y entre las dos páginas.
-export function initBasemaps(map){
-  const layers = {
-    "Satélite": L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-      maxZoom:22, maxNativeZoom:19, attribution:"Imagery © Esri" }),
-    "Callejero": L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom:22, maxNativeZoom:19, attribution:"© OpenStreetMap" }),
-    "Claro": L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      maxZoom:22, maxNativeZoom:20, attribution:"© OpenStreetMap, © CARTO" }),
-    "Oscuro": L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      maxZoom:22, maxNativeZoom:20, attribution:"© OpenStreetMap, © CARTO" }),
-    "Relieve": L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}", {
-      maxZoom:22, maxNativeZoom:13, attribution:"Relieve © Esri" }),
-  };
+// ── Mapa (MapLibre GL: rota con 2 dedos, inclina, zoom fluido) ───────────────
+// Las 5 bases raster van en un solo estilo y se alternan por visibilidad;
+// la elegida se recuerda entre visitas y entre las dos páginas.
+const BASES = {
+  "Callejero": { tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], max:19, attr:"© OpenStreetMap" },
+  "Satélite":  { tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], max:19, attr:"Imagery © Esri" },
+  "Claro":     { tiles:["a","b","c","d"].map(s => `https://${s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png`), max:20, attr:"© OpenStreetMap, © CARTO" },
+  "Oscuro":    { tiles:["a","b","c","d"].map(s => `https://${s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png`), max:20, attr:"© OpenStreetMap, © CARTO" },
+  "Relieve":   { tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}"], max:13, attr:"Relieve © Esri" },
+};
+
+export function createMap(container){
+  const style = { version:8, sources:{}, layers:[
+    { id:"bg", type:"background", paint:{ "background-color":"#0b0e1a" } } ] };
+  for(const [name, b] of Object.entries(BASES)){
+    style.sources["src-" + name] = { type:"raster", tiles:b.tiles, tileSize:256, maxzoom:b.max, attribution:b.attr };
+    style.layers.push({ id:"base-" + name, type:"raster", source:"src-" + name, layout:{ visibility:"none" } });
+  }
   const saved = localStorage.getItem("proxi_basemap");
-  (layers[saved] || layers["Callejero"]).addTo(map);
-  L.control.layers(layers, null, { position:"topright" }).addTo(map);
-  map.on("baselayerchange", e => localStorage.setItem("proxi_basemap", e.name));
+  let current = BASES[saved] ? saved : "Callejero";
+  style.layers.find(l => l.id === "base-" + current).layout.visibility = "visible";
+
+  const map = new maplibregl.Map({
+    container, style,
+    center:[-70.6693, -33.4489], zoom:3, maxZoom:22,
+    attributionControl:{ compact:true }
+  });
+  map.doubleClickZoom.disable();      // el doble clic/tap es acción de la app
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch:true }), "top-right");
+
+  function pick(name){
+    whenReady(map, () => {
+      for(const n of Object.keys(BASES))
+        map.setLayoutProperty("base-" + n, "visibility", n === name ? "visible" : "none");
+    });
+    current = name;
+    localStorage.setItem("proxi_basemap", name);
+  }
+  // selector de estilo de mapa (control propio: MapLibre no trae uno)
+  map.addControl({
+    onAdd(){
+      const c = document.createElement("div");
+      c.className = "maplibregl-ctrl maplibregl-ctrl-group proxi-bases";
+      const btn = document.createElement("button");
+      btn.type = "button"; btn.textContent = "🗺"; btn.title = "Estilo de mapa";
+      const list = document.createElement("div"); list.className = "list";
+      for(const name of Object.keys(BASES)){
+        const it = document.createElement("button");
+        it.type = "button"; it.textContent = name;
+        it.classList.toggle("on", name === current);
+        it.addEventListener("click", () => {
+          pick(name);
+          list.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === it));
+          list.classList.remove("open");
+        });
+        list.appendChild(it);
+      }
+      btn.addEventListener("click", () => list.classList.toggle("open"));
+      map.on("mousedown", () => list.classList.remove("open"));
+      c.append(btn, list);
+      return c;
+    },
+    onRemove(){}
+  }, "top-right");
+  return map;
+}
+
+function whenReady(map, fn){ if(map.isStyleLoaded()) fn(); else map.once("load", fn); }
+
+// Dibuja o reemplaza una línea (coords como [[lat,lng],…]; dash en múltiplos del ancho).
+export function setLine(map, id, latlngs, { color="#45c6f0", width=4, opacity=.9, dash=null } = {}){
+  const geo = { type:"Feature", geometry:{ type:"LineString", coordinates: latlngs.map(c => [c[1], c[0]]) } };
+  whenReady(map, () => {
+    if(map.getLayer(id)) map.removeLayer(id);
+    if(map.getSource(id)) map.removeSource(id);
+    map.addSource(id, { type:"geojson", data:geo });
+    map.addLayer({ id, type:"line", source:id,
+      layout:{ "line-cap":"round", "line-join":"round" },
+      paint:{ "line-color":color, "line-width":width, "line-opacity":opacity,
+              ...(dash ? { "line-dasharray":dash } : {}) } });
+  });
+}
+export function removeLine(map, id){
+  whenReady(map, () => {
+    if(map.getLayer(id)) map.removeLayer(id);
+    if(map.getLayer(id + "-out")) map.removeLayer(id + "-out");
+    if(map.getSource(id)) map.removeSource(id);
+  });
+}
+
+// Círculo de precisión (radio en metros) como polígono relleno.
+export function setCircle(map, id, lat, lng, radiusM, color = "#ff4d6d"){
+  const ring = [];
+  const dLat = radiusM / 111320, dLng = radiusM / (111320 * Math.cos(lat * Math.PI/180));
+  for(let i = 0; i <= 64; i++){
+    const a = 2 * Math.PI * i / 64;
+    ring.push([lng + dLng * Math.cos(a), lat + dLat * Math.sin(a)]);
+  }
+  const geo = { type:"Feature", geometry:{ type:"Polygon", coordinates:[ring] } };
+  whenReady(map, () => {
+    const src = map.getSource(id);
+    if(src){ src.setData(geo); return; }
+    map.addSource(id, { type:"geojson", data:geo });
+    map.addLayer({ id, type:"fill", source:id, paint:{ "fill-color":color, "fill-opacity":.08 } });
+    map.addLayer({ id:id + "-out", type:"line", source:id, paint:{ "line-color":color, "line-width":1, "line-opacity":.5 } });
+  });
+}
+
+// ── Ubicación robusta ────────────────────────────────────────────────────────
+// watchPosition que se re-arma solo: al volver a la pestaña, al conceder el
+// permiso desde el navegador, o manualmente (restart). Evita el clásico
+// "no pidió ubicación / dejó de actualizar hasta recargar".
+export function watchLocation(onFix, onProblem){
+  let watchId = null, lastFix = 0;
+  function start(){
+    if(!("geolocation" in navigator)){ if(onProblem) onProblem("unsupported"); return; }
+    if(watchId != null) navigator.geolocation.clearWatch(watchId);
+    watchId = navigator.geolocation.watchPosition(
+      p => { lastFix = Date.now(); onFix(p); },
+      e => { if(onProblem) onProblem(e.code === 1 ? "denied" : "error"); },
+      { enableHighAccuracy:true, maximumAge:1000, timeout:20000 });
+  }
+  const revive = () => { if(Date.now() - lastFix > 15000) start(); };
+  document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") revive(); });
+  addEventListener("pageshow", revive);
+  if(navigator.permissions && navigator.permissions.query){
+    navigator.permissions.query({ name:"geolocation" })
+      .then(st => st.addEventListener("change", () => { if(st.state === "granted") start(); }))
+      .catch(()=>{});
+  }
+  start();
+  return { restart: start };
 }
 
 // ── Perfil: nombre + cuenta Google opcional ──────────────────────────────────
