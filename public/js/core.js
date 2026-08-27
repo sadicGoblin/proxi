@@ -357,6 +357,16 @@ export function recentRooms(){
   catch(e){ return []; }
 }
 
+// ¿Estamos corriendo como app instalada (APK/TWA o PWA) y no en una pestaña?
+// El referrer android-app:// solo llega en la primera navegación: se recuerda.
+export function isApp(){
+  try{
+    if(document.referrer.startsWith("android-app://")) sessionStorage.setItem("proxi_twa", "1");
+    return matchMedia("(display-mode: standalone)").matches
+        || sessionStorage.getItem("proxi_twa") === "1";
+  }catch(e){ return false; }
+}
+
 // Mantiene la pantalla encendida mientras Proxi está visible: si la pantalla se
 // bloquea, el navegador congela la página y la posición deja de actualizarse.
 // (Si el usuario bloquea a mano igual se congela; eso solo lo resuelve una app nativa.)

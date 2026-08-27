@@ -150,7 +150,7 @@
       <p class="ltext">Comparte un link y véanse en el mapa en tiempo real, o fijen el punto de junta del grupo. Sin instalar nada.</p>
       <button class="lbtn main" id="landCrear">📍 Crear sala en vivo</button>
       <a class="lbtn alt" href="junta.html">🚩 Junta del grupo</a>
-      <a class="lbtn ghost" href="descargar.html">📲 Instalar en tu teléfono</a>
+      <a class="lbtn ghost" href="descargar.html" id="installLink">📲 Instalar en tu teléfono</a>
 
       <div class="lsec" id="recentSec" style="display:none">
         <h2>Tus grupos recientes</h2>
@@ -192,7 +192,7 @@
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script type="module">
     import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { db, rnd, ensureAuth, setupProfile, createMap, setCircle, photoOf, esc, haversine, createPresence, registerSW, keepAwake, watchLocation, rememberRoom, recentRooms, STALE_MS, GONE_MS } from "./js/core.js";
+    import { db, rnd, ensureAuth, setupProfile, createMap, setCircle, photoOf, esc, haversine, createPresence, registerSW, keepAwake, watchLocation, rememberRoom, recentRooms, isApp, STALE_MS, GONE_MS } from "./js/core.js";
 
     registerSW();
 
@@ -201,6 +201,7 @@
     if(!room){
       document.getElementById("landing").classList.add("on");
       document.getElementById("landCrear").addEventListener("click", () => { location.search = "?s=" + rnd(5); });
+      if(isApp()) document.getElementById("installLink").style.display = "none";   // ya estás en la app
       // grupos recientes: volver a tus salas/juntas de un toque
       const rec = recentRooms();
       if(rec.length){

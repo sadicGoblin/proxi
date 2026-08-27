@@ -109,10 +109,16 @@
       btn.classList.remove("on"); done.classList.add("on");
     });
 
-    // Si ya está corriendo como app instalada
-    if(matchMedia("(display-mode: standalone)").matches){
+    // Si ya está corriendo como app instalada (PWA o APK/TWA)
+    let inApp = false;
+    try{
+      if(document.referrer.startsWith("android-app://")) sessionStorage.setItem("proxi_twa", "1");
+      inApp = matchMedia("(display-mode: standalone)").matches || sessionStorage.getItem("proxi_twa") === "1";
+    }catch(e){}
+    if(inApp){
       btn.classList.remove("on"); done.classList.add("on");
       done.textContent = "✓ Ya estás usando Proxi como app";
+      document.querySelector(".cta2").style.display = "none";
     }
 
     // Mostrar solo la tarjeta que corresponde al equipo
