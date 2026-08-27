@@ -6,26 +6,57 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Config del proyecto proxi-live (la misma clave pública que usa la web).
-// Nota: cuando registremos la app Android en la consola de Firebase
-// (flutterfire configure), esto se reemplaza por las opciones propias.
-const firebaseOptions = FirebaseOptions(
-  apiKey: 'AIzaSyCiqAsxD7_Me22aGHT9SO_AnRkJFyC5Xaw',
-  appId: '1:188965732831:web:dd1eced1c6ce771c1ac46a',
-  messagingSenderId: '188965732831',
-  projectId: 'proxi-live',
-);
-
+// La app Android está registrada en el proyecto proxi-live: la config nativa
+// vive en android/app/google-services.json (generada con `firebase apps:*`).
 late final FirebaseFirestore db;
 
 Future<String> initFirebase() async {
-  await Firebase.initializeApp(options: firebaseOptions);
+  await Firebase.initializeApp();
   db = FirebaseFirestore.instance;
   final auth = FirebaseAuth.instance;
   final user = auth.currentUser ?? (await auth.signInAnonymously()).user!;
   return user.uid;
+}
+
+// ── Google Sign-In ───────────────────────────────────────────────────────────
+// Igual que la web: primero intenta VINCULAR la sesión anónima (conserva el
+// uid → conserva rol de organizador); si la cuenta Google ya existía, entra
+// con ella (uid nuevo). Devuelve el usuario, o null si el usuario canceló.
+Future<User?> signInGoogle() async {
+  final g = GoogleSignIn(scopes: ['email']);
+  final acc = await g.signIn();
+  if (acc == null) return null; // canceló el selector de cuenta
+  final a = await acc.authentication;
+  final cred = GoogleAuthProvider.credential(idToken: a.idToken, accessToken: a.accessToken);
+  final auth = FirebaseAuth.instance;
+  try {
+    return (await auth.currentUser!.linkWithCredential(cred)).user;
+  } on FirebaseAuthException catch (e) {
+    if (e.code == 'credential-already-in-use' ||
+        e.code == 'email-already-in-use' ||
+        e.code == 'provider-already-linked') {
+      return (await auth.signInWithCredential(cred)).user;
+    }
+    rethrow;
+  }
+}
+
+Future<void> signOutGoogle() async {
+  try { await GoogleSignIn().signOut(); } catch (_) {}
+  await FirebaseAuth.instance.signOut();
+  await FirebaseAuth.instance.signInAnonymously(); // vuelve como invitado (uid nuevo)
+}
+
+// Foto de perfil apta para compartir en presencia (reglas: https y ≤300).
+String? profilePhoto() {
+  final u = FirebaseAuth.instance.currentUser;
+  if (u == null || u.isAnonymous) return null;
+  final p = u.photoURL;
+  if (p == null || !p.startsWith('https://') || p.length > 300) return null;
+  return p;
 }
 
 // Mismo alfabeto de códigos de sala que la web (sin caracteres confusos).

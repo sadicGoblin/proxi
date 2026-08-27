@@ -109,7 +109,7 @@ class _SalaScreenState extends State<SalaScreen> {
     try {
       await _meDoc.set({
         'name': _name,
-        'photo': null,
+        'photo': profilePhoto(),   // con Google: tu foto en el mapa de todos
         'lat': p.latitude,
         'lng': p.longitude,
         'acc': p.accuracy,
@@ -168,21 +168,28 @@ class _SalaScreenState extends State<SalaScreen> {
       final isMe = id == widget.uid;
       final label = (isMe ? 'tú' : (m['name'] as String? ?? 'amigo')) +
           (stale ? ' · ${agoTxt(t)}' : '');
+      final ph = m['photo'];
+      final photo = (ph is String && ph.startsWith('https://') && ph.length <= 300) ? ph : null;
+      final color = isMe ? kYou : kFriend;
       markers.add(Marker(
         point: LatLng((m['lat'] as num).toDouble(), (m['lng'] as num).toDouble()),
-        width: 160, height: 56, alignment: Alignment.center,
+        width: 160, height: photo != null ? 68 : 56, alignment: Alignment.center,
         child: Opacity(
           opacity: stale ? .5 : 1,
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             _pill(label),
             const SizedBox(height: 3),
             Container(
-              width: 18, height: 18,
+              width: photo != null ? 34 : 18,
+              height: photo != null ? 34 : 18,
               decoration: BoxDecoration(
-                color: isMe ? kYou : kFriend,
+                color: color,
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2.5),
-                boxShadow: [BoxShadow(color: (isMe ? kYou : kFriend).withValues(alpha: .8), blurRadius: 12)],
+                border: Border.all(color: photo != null ? color : Colors.white, width: 2.5),
+                image: photo != null
+                    ? DecorationImage(image: NetworkImage(photo), fit: BoxFit.cover)
+                    : null,
+                boxShadow: [BoxShadow(color: color.withValues(alpha: .8), blurRadius: 12)],
               ),
             ),
           ]),

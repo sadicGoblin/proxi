@@ -1,5 +1,6 @@
 // Proxi nativa — la diferencia con la web/APK-TWA: ubicación en segundo plano
 // (te siguen viendo llegar con la pantalla bloqueada), y pronto notificaciones.
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'core.dart';
@@ -74,10 +75,30 @@ class _HomeScreenState extends State<HomeScreen> {
     await saveName(_nameCtl.text.trim().isEmpty ? 'Invitado-${rnd(3)}' : _nameCtl.text.trim());
     await rememberRoom(room);
     if (!mounted) return;
+    // uid vigente: puede haber cambiado si entraste con una cuenta Google previa
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? widget.uid;
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => SalaScreen(uid: widget.uid, room: room)),
+      MaterialPageRoute(builder: (_) => SalaScreen(uid: uid, room: room)),
     );
     _loadRecent();
+  }
+
+  Future<void> _google() async {
+    try {
+      final u = await signInGoogle();
+      if (u == null) return; // canceló
+      // adopta el nombre de Google si aún usas el de invitado (igual que la web)
+      if (_nameCtl.text.startsWith('Invitado-') && (u.displayName ?? '').isNotEmpty) {
+        final n = u.displayName!.trim();
+        _nameCtl.text = n.length > 18 ? n.substring(0, 18) : n;
+        await saveName(_nameCtl.text);
+      }
+      setState(() {});
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No se pudo iniciar con Google · revisa tu conexión')));
+    }
   }
 
   @override
@@ -132,6 +153,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const Text('📍 Crear grupo nuevo',
                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white)),
             ),
+            const SizedBox(height: 8),
+            _googleSection(),
             if (_recent.isNotEmpty) ...[
               const SizedBox(height: 28),
               const Text('TUS GRUPOS RECIENTES',
@@ -156,6 +179,42 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(color: kMute, fontSize: 12, height: 1.5),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // Con Google tu foto aparece en el mapa (también para quienes usan la web)
+  // y tu rol de organizador no se pierde al reinstalar.
+  Widget _googleSection() {
+    final u = FirebaseAuth.instance.currentUser;
+    final logged = u != null && !u.isAnonymous;
+    if (!logged) {
+      return FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1F1F1F),
+          padding: const EdgeInsets.symmetric(vertical: 15),
+        ),
+        onPressed: _google,
+        icon: const Text('G', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF4285F4))),
+        label: const Text('Continuar con Google', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+      );
+    }
+    final photo = profilePhoto();
+    return Card(
+      color: kSurface2,
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: kSurface,
+          backgroundImage: photo != null ? NetworkImage(photo) : null,
+          child: photo == null ? Text((_nameCtl.text.isNotEmpty ? _nameCtl.text[0] : '?').toUpperCase()) : null,
+        ),
+        title: Text(u.displayName ?? 'Cuenta Google', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+        subtitle: Text(u.email ?? '', style: const TextStyle(color: kMute, fontSize: 12)),
+        trailing: TextButton(
+          onPressed: () async { await signOutGoogle(); setState(() {}); },
+          child: const Text('Salir', style: TextStyle(color: kMute)),
         ),
       ),
     );

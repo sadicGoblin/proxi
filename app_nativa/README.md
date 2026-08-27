@@ -11,8 +11,11 @@ de sala, mismos miembros, misma junta.
   levanta un servicio en primer plano (notificación persistente estilo Google
   Maps) y tu posición se sigue compartiendo **con la pantalla bloqueada** o con
   la app minimizada. Al salir del grupo, se apaga y tu posición se borra.
+- ✅ **Google Sign-In nativo** (selector de cuentas del sistema): vincula la
+  sesión anónima (conserva uid → conserva rol de organizador); tu foto aparece
+  en el mapa de todos, web incluida, y los pins muestran las fotos del grupo.
 - 🔜 Notificaciones: "movieron la junta", "X llegó al punto".
-- 🔜 Geofencing de llegada, modo ahorro de batería, perfil con foto.
+- 🔜 Geofencing de llegada, modo ahorro de batería, editar la junta desde la app.
 
 ## Correr y compilar
 
@@ -27,11 +30,12 @@ Modo de desarrollador de Windows).
 
 ## Estado / pendientes técnicos
 
-- Firebase se inicializa con opciones manuales (la misma config pública de la
-  web, en `lib/core.dart`). Funciona para auth anónima y Firestore. Para
-  Google Sign-In nativo y notificaciones push hay que **registrar la app
-  Android en la consola de Firebase** (`flutterfire configure`) — eso genera
-  opciones propias y pide la huella SHA-1/SHA-256 de la firma.
+- La app Android está **registrada en el proyecto Firebase** (hecho por CLI:
+  `firebase apps:create` + `apps:android:sha:create` con las huellas del
+  keystore debug). La config vive en `android/app/google-services.json`.
+  Si cambias la firma (keystore propio de release), registra sus SHA-1/SHA-256
+  con `firebase apps:android:sha:create 1:188965732831:android:ba3ed26ec172dbf31ac46a <SHA>`
+  o el login de Google dejará de funcionar en esa build.
 - Release firmado con la llave debug por defecto; antes de distribuir en serio,
   configurar firma propia en `android/app/build.gradle.kts` (ver
   `twa/README.md` para el patrón keystore.properties).
